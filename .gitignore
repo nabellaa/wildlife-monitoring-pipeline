@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+env/
+venv/
+.venv/
+cameratrap/
+conda-meta/
+
+# VS Code
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (VERY IMPORTANT for your project)
+data/
+*.csv
+*.sqlite
+*.db
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Output files (your pipeline outputs)
+outputs/
+results/
+figures/

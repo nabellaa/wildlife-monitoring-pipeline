@@ -1,0 +1,86 @@
+# Lesson 1 - Python Paths
+
+## What is pathlib?
+
+`pathlib` is a Python library for working with files and folders.
+
+Why use it?
+
+- Cleaner code
+- Portable across Windows, macOS and Linux
+- Easier than writing file paths manually
+
+---
+
+## What is Path?
+
+A `Path` object points to a file or folder.
+
+Example:
+
+```python
+sample_folder = project_root / "data" / "sample"
+```
+
+Unlike a string, a Path object has useful methods like:
+
+```python
+.exists()
+.is_dir()
+.glob()
+```
+
+---
+
+## Relative vs Absolute Paths
+
+Absolute Path
+
+```
+C:\Users\SCSM11\Documents\...
+```
+
+Relative Path
+
+```
+../data/sample
+```
+
+Project Path (recommended)
+
+```python
+project_root / "data" / "sample"
+```
+
+---
+
+## Useful Methods
+
+exists()
+
+Returns True if the path exists.
+
+is_dir()
+
+Checks whether the path is a folder.
+
+glob("*.JPG")
+
+Finds all JPG files inside the folder.
+
+name
+
+Returns only the filename.
+
+```
+IMG_0001.JPG
+```
+
+## UTF-8 Encoding
+
+When saving a text file, Python needs to know how to encode the characters.
+
+We use:
+
+```python
+encoding="utf-8"
