@@ -5,11 +5,20 @@ Script: 01_data_audit.py
 Purpose:
     Audit the sample camera trap dataset.
 
+Stage in Pipeline:
+    01 - Data Understanding / Exploration
+
 Author:
     Bella
 
 Project:
     Wildlife Monitoring Pipeline
+
+Description:
+    This script scans the raw camera trap dataset and
+    provides a summary of the data structure, including
+    number of images, folder organization, and basic
+    dataset characteristics.
 ==================================================
 """
 
