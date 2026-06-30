@@ -1,6 +1,6 @@
 """
 ==================================================
-Script: 04_run_speciesnet.py
+Script: script04_run_speciesnet.py
 
 Purpose
     Classify each detected animal image using SpeciesNet.
@@ -38,20 +38,22 @@ from pathlib import Path
 # ==================================================
 # 2. Settings and Paths
 # ==================================================
+import sys
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
+from config.paths import get_deployment_paths
 
 COUNTRY_CODE = "MYS"
 
-INPUT_FILE = Path(
-    "outputs/detection/detection_dataset.csv"
-)
-
-OUTPUT_DIR = Path(
-    "outputs/speciesnet"
-)
-
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-OUTPUT_FILE = OUTPUT_DIR / "speciesnet_results.json"
+deployment = sys.argv[1]
+paths = get_deployment_paths(deployment)
+INPUT_FILE = paths["detection_csv"]
+OUTPUT_DIR = paths["speciesnet_folder"]
+OUTPUT_FILE = paths["speciesnet_json"]
 
 # ==================================================
 # 3. Read the detection dataset

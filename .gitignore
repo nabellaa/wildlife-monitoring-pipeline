@@ -24,6 +24,7 @@ data/
 *.db
 
 # Logs
+logs/
 *.log
 
 # OS files
@@ -32,5 +33,20 @@ Thumbs.db
 
 # Output files (your pipeline outputs)
 outputs/
+deployment_summary.csv
+wildlife_dataset_master.csv
 results/
 figures/
+processed/
+wildlife_dataset.csv
+
+# =========================
+# Backup system
+# =========================
+backup/
+*.bak
+
+# =========================
+# Docs notes (your request)
+# =========================
+docs/**/*.txt

@@ -1,6 +1,6 @@
 """
 ==================================================
-Script: 02_run_megadetector.py
+Script: script02_run_megadetector.py
 
 Purpose:
     Run MegaDetector on camera trap images.
@@ -34,19 +34,29 @@ from megadetector.detection.run_detector_batch import (
 # ==================================================
 # 2. Project Paths
 # ==================================================
+import sys
 
-project_root = Path(__file__).resolve().parent.parent
+# allow Python to find your config folder.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-sample_folder = project_root / "data" / "sample" / "REC055_199A"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+    
+from config.paths import (
+    SAMPLE_PATH,
+    get_deployment_paths
+)
+
+deployment = sys.argv[1]
+paths = get_deployment_paths(deployment)
+sample_folder = SAMPLE_PATH / deployment
 
 # ==================================================
 # 3. Output Paths
 # ==================================================
 
-output_folder = project_root / "outputs" / "megadetector"
-output_folder.mkdir(parents=True, exist_ok=True)
-
-output_file = output_folder / "megadetector_results.json"
+output_folder = paths["megadetector_folder"]
+output_file = paths["megadetector_json"]
 
 # ==================================================
 # 4. Find Photos

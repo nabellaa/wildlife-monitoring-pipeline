@@ -1,6 +1,6 @@
 """
 ==================================================
-Script: 01_data_audit.py
+Script: script01_audit.py
 
 Purpose:
     Audit the sample camera trap dataset.
@@ -35,27 +35,30 @@ from datetime import datetime
 # ==================================================
 # 2. Project Paths
 # ==================================================
+import sys
 
-project_root = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# __file__ = current Python script
-# .resolve() = full absolute path
-# .parent.parent = move up two folders to project root
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
-sample_folder = project_root / "data" / "sample" / "REC055_199A"
+from config.paths import (
+    SAMPLE_PATH,
+    AUDIT_OUTPUT,
+    AUDIT_REPORT
+)
 
-# Build the path without hardcoding
-# C:\Users\Bella\...
-# Makes the project portable.
+sample_folder = SAMPLE_PATH / "REC055_199A"
 
-# ==================================================
-# 3. Output Paths
-# ==================================================
+AUDIT_OUTPUT.mkdir(
+    parents=True,
+    exist_ok=True
+)
 
-output_folder = project_root / "outputs" / "audit"
-output_folder.mkdir(parents=True, exist_ok=True)
+output_folder = AUDIT_OUTPUT
 
-report_file = output_folder / "audit_report.txt"
+report_file = AUDIT_REPORT
+
 
 # mkdir() creates the folder if it doesn't exist.
 # parents=True  → Create missing parent folders.

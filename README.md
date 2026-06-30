@@ -12,29 +12,150 @@ An AI-assisted end-to-end wildlife monitoring system that transforms camera trap
 
 ## Project Overview
 
-This project automates wildlife data processing from raw camera trap images into a final structured dataset using AI models and data engineering workflows.
+This system processes wildlife camera trap images through:
 
-It is designed to support ecological research by reducing manual image sorting and species identification work.
+- AI detection (MegaDetector)
+- Species classification (SpeciesNet)
+- Human verification system
+- Multi-deployment dataset management
+- Master + Clean dataset generation
+- Analytics-ready ecological data pipeline
+
+It is designed for **scalable biodiversity monitoring across multiple locations and experiments**.
 
 ---
 
-## System Pipeline
+## App Preview
+
+### Deployment and Pipeline Runner
+![Deployment and Pipeline Runner](docs/images/deployment_pipeline.png)
+
+### Folder Information and Event Queue
+![Folder Information and Event Queue](docs/images/info_review_queue.png)
+
+### Review Interface
+![Review Interface](docs/images/review_interface.png)
+
+### AI Prediction Information
+![AI Prediction Information](docs/images/ai_prediction_info.png)
+
+--- 
+
+# System Architecture
+
+The system is built in **three main layers**:
+
+---
+
+## 1. Deployment Layer (Experiment Level → Future Batch-Based System)
+
+Each deployment is an independent processing unit.
+
+### Features:
+- Raw image processing
+- Detection + classification pipeline
+- Review system (human-in-the-loop)
+- Logs, backups, and session state
+
+### Structure:
+```text
+deployments/
+├── deployment_01/
+├── deployment_02/
+├── deployment_03/
+
+```
+
+Each deployment is fully independent and reproducible.
+
+---
+
+## 2. Master Dataset Layer (Aggregation Layer)
+
+All deployments are merged into a single dataset:
+
+### Responsibilities:
+- Combine all deployment outputs
+- Standardize schema across runs
+- Add deployment metadata
+- Ensure cross-experiment consistency
+
+### Output:
+- master_dataset_raw.csv
+
+---
+
+## 3. Clean Dataset Layer (Final Intelligence Layer)
+
+Final curated dataset for analytics and dashboards.
+
+### Responsibilities:
+- Taxonomy normalization
+- Species name standardization
+- Review reconciliation
+- Duplicate handling
+- Final truth dataset generation
+
+### Output:
+- clean_dataset.csv
+
+---
+
+# System Pipeline Flow
 
 ```text
-Camera Trap
-↓
-AI Pipeline
-↓
-Review App
-↓
-Final Dataset
+Camera Trap Images
+        ↓
+script01_audit.py
+        ↓
+script02_run_megadetector.py
+        ↓
+script03_build_detection.py
+        ↓
+script04_run_speciesnet.py
+        ↓
+script05_merge_species_results.py
+        ↓
+script06_build_review_queue.py
+        ↓
+wildlife_monitor.py (Review UI)
+        ↓
+script08_backup_manager.py
+        ↓
+script09_build_master_dataset.py
+        ↓
+Clean Dataset Generation
+```
+
+---
+
+# Project Structure
+
+```text
+config/
+├── deployment.py
+├── paths.py
+
+app/
+├── wildlife_monitor.py   # Streamlit Review Interface
+
+scripts/
+├── script01_audit.py
+├── script02_run_megadetector.py
+├── script03_build_detection.py
+├── script04_run_speciesnet.py
+├── script05_merge_species_results.py
+├── script06_build_review_queue.py
+├── script08_backup_manager.py
+├── script09_build_master_dataset.py
+├── species_lookup.py        ⭐ (in progress)
+├── pipeline_runner.py
+
 ```
 
 ---
 
 ## AI Pipeline Workflow
-
-The AI Pipeline includes:
 
 ### 1. Data Audit  
    - Validate raw camera trap images and metadata  
@@ -45,34 +166,69 @@ The AI Pipeline includes:
 
 ### 3. Detection Dataset Building  
    - Convert detection outputs into structured tables  
+   - Standardize event-based dataset (event_id)
 
 ### 4. Species Classification (SpeciesNet)  
    - Predict species from detected animals  
    - Generate confidence scores  
+   - Flag low-confidence predictions for review
 
 ### 5. Data Integration  
    - Merge detection + classification results  
    - Extract taxonomy hierarchy (class → species)  
+   - Build unified dataset with taxonomy-ready structure
 
 ### 6. Processed Dataset Creation  
-   - Generate analysis-ready dataset  
+   - Identify cases requiring human verification:
+      - unknown species
+      - low confidence predictions
+      - conflicting AI outputs 
+
+### 7. Human-in-the-loop Review System 
+   - Streamlit-based review interface
+   - Features:
+         - species verification dropdown
+         - “Other…” dynamic species input
+         - event-based navigation 
+
+### 8. Review Logging + Undo System 
+   - Full action tracking:
+      - original prediction
+      - user correction
+      - timestamp + event ID
+   - Undo system for safe rollback of changes
+
+### 9. Master Dataset Builder 
+   - Aggregates all reviewed and processed data
+   - Produces final structured dataset for analytics
+
+### 10. Clean Dataset Output  
+   - Final analysis-ready dataset for research and dashboards
 
 ---
 
 ## Final Output Dataset
 
-The final dataset contains:
-
 ### Image Metadata
 - image_path
+- file_name
 - folder_name
-- timestamp
-- event sequence
+- capture_datetime
+- temperature_c
+- moon_phase
+- event_number
+- sequence
 
 ### AI Predictions
-- top-1 species prediction
-- confidence score
-- detection confidence
+- prediction_class
+- prediction_species
+- prediction_common_name
+- prediction_score
+
+### Classifier Output
+- classifier_species
+- classifier_common_name
+- classifier_score
 
 ### Taxonomy
 - class
@@ -83,9 +239,12 @@ The final dataset contains:
 - common name
 
 ### Human Review Layer
-- review_status (Pending / Verified / Corrected / Skipped)
+- review_status
+- review_required
+- verified_common_name
 - reviewer
 - review_notes
+- review_timestamp
 
 ---
 
@@ -100,29 +259,6 @@ The final dataset contains:
 
 ---
 
-## Project Structure
-
-```text
-wildlife-monitoring-pipeline/
-│
-├── scripts/
-│ ├── 01_data_audit.py
-│ ├── 02_run_megadetector.py
-│ ├── 03_build_detection_dataset.py
-│ ├── 04_run_speciesnet.py
-│ └── 05_merge_species_results.py
-│
-├── outputs/
-│ ├── detection/
-│ ├── speciesnet/
-│ └── processed/ wildlife_dataset.csv
-│
-└── README.md
-```
-
-
----
-
 ## Key Features
 
 - End-to-end AI wildlife processing pipeline
@@ -133,16 +269,37 @@ wildlife-monitoring-pipeline/
 
 ---
 
-## Status
+## Current Development Status
 
-Active Development
+Completed Core System:
+- AI detection pipeline
+- Species classification pipeline
+- Review system (Streamlit UI)
+- Undo + backup system
+- Review logging system
+- Multi-deployment support
 
-Planned improvements:
-- Database integration (PostgreSQL)
-- Review web app (Streamlit)
-- Fully automated pipeline execution
-- Analytics dashboard (Power BI / Python)
-- Model evaluation metrics layer
+In Progress:
+- script09_build_master_dataset.py
+- species_lookup.py (taxonomy enrichment system)
+
+Next Phase (Intelligence Layer): 
+- Merge other data of the camera site
+   - coordinates
+   - habitat type
+   - environment 
+
+- Analytics Dashboard
+   Deployment comparison
+   Species distribution analysis
+   Confidence scoring trends
+   Review performance metrics
+
+- Admin Panel
+   Species dictionary management
+   Backup management system
+   Review logs explorer
+   System monitoring
 
 ---
 

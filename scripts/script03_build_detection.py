@@ -1,6 +1,6 @@
 """
 ==================================================
-Script: 03_build_detection_dataset.py
+Script: script03_build_detection.py
 
 Purpose:
     Convert MegaDetector detection results into a structured CSV dataset for downstream analysis.
@@ -44,27 +44,28 @@ Project:
 # ==================================================
 
 import json
-
 import subprocess
-
 import pandas as pd
-
 from pathlib import Path
-
 from datetime import datetime
 
 # ==================================================
 # 2. Paths
 # ==================================================
+import sys
 
-project_root = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-input_file = (project_root/ "outputs"/ "megadetector"/ "megadetector_results.json")
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+    
+from config.paths import get_deployment_paths
 
-output_folder = (project_root/ "outputs"/ "detection")
-output_folder.mkdir(parents=True, exist_ok=True)
-
-output_file = (output_folder/ "detection_dataset.csv")
+deployment = sys.argv[1]
+paths = get_deployment_paths(deployment)
+input_file = paths["megadetector_json"]
+output_folder = paths["detection_folder"]
+output_file = paths["detection_csv"]
 
 # ==================================================
 # 2. Detection Settings

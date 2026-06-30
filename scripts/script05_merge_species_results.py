@@ -1,6 +1,6 @@
 """
 ==============================================================================
-Script 05 - Merge SpeciesNet Results
+script05_merge_species_results
 ------------------------------------------------------------------------------
 Purpose:
 Merge the Detection Dataset with SpeciesNet predictions to produce the
@@ -35,19 +35,20 @@ from pathlib import Path
 # ==================================================
 # 2. Paths
 # ==================================================
+import sys
 
-ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# Input files
-detection_file = ROOT / "outputs" / "detection" / "detection_dataset.csv"
-speciesnet_file = ROOT / "outputs" / "speciesnet" / "speciesnet_results.json"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
-# Output folder (make sure it exists)
-output_dir = ROOT / "outputs" / "processed"
-output_dir.mkdir(parents=True, exist_ok=True)
+from config.paths import get_deployment_paths
 
-# Output file
-output_file = output_dir / "wildlife_dataset.csv"
+deployment = sys.argv[1]
+paths = get_deployment_paths(deployment)
+detection_file = paths["detection_csv"]
+speciesnet_file = paths["speciesnet_json"]
+output_file = paths["dataset"]
 
 # ==================================================
 # 3. Load Data
@@ -95,6 +96,28 @@ def parse_speciesnet_prediction(prediction):
     while len(parts) < 7:
         parts.append("")
 
+    # ----------------------------------------------
+    # Determine prediction rank
+    # ----------------------------------------------
+
+    if parts[5]:
+        prediction_rank = "Species"
+
+    elif parts[4]:
+        prediction_rank = "Genus"
+
+    elif parts[3]:
+        prediction_rank = "Family"
+
+    elif parts[2]:
+        prediction_rank = "Order"
+
+    elif parts[1]:
+        prediction_rank = "Class"
+
+    else:
+        prediction_rank = "Unknown"
+
     return {
 
         "prediction_class": parts[1].title(),
@@ -102,10 +125,10 @@ def parse_speciesnet_prediction(prediction):
         "prediction_family": parts[3].title(),
         "prediction_genus": parts[4].title(),
         "prediction_species": parts[5].title(),
-        "prediction_common_name": parts[6].title()
+        "prediction_common_name": parts[6].title(),
+        "prediction_rank": prediction_rank
 
     }
-
 # ==================================================
 # 6. Parse Top-1 SpeciesNet Predictions
 # ==================================================
@@ -131,7 +154,6 @@ def parse_classifier_prediction(item):
         "classifier_score": scores[0]
 
     }
-
 
 # ==================================================
 # 7. Merge Datasets
@@ -169,14 +191,25 @@ for index, row in dataset.iterrows():
     dataset.loc[index, "prediction_score"] = species.get("prediction_score")
 
 # ==================================================
-# 8. Review Columns  
+# 8. Create Verified Taxonomy Columns
 # ==================================================
 
-dataset["review_status"] = "Pending"
-dataset["review_required"] = ""
-dataset["verified_species"] = ""
-dataset["reviewer"] = ""
-dataset["review_notes"] = ""
+VERIFIED_COLUMNS = [
+
+    "scientific_name",
+
+    "taxonomy_class",
+    "taxonomy_order",
+    "taxonomy_family",
+    "taxonomy_genus",
+    "taxonomy_species"
+
+]
+
+for column in VERIFIED_COLUMNS:
+
+    if column not in dataset.columns:
+        dataset[column] = ""
 
 # ==================================================
 # 9. Save the final dataset
@@ -190,9 +223,11 @@ dataset.to_csv(
 print()
 
 print("=" * 40)
-print("Wildlife Dataset Complete")
+print("Merging Dataset Complete")
 print("=" * 40)
 
 print(f"Images : {len(dataset)}")
 print(f"Saved : {output_file}")
 
+# later we can use this for full sc name
+# scientific_name = f"{prediction_genus} {prediction_species}"
