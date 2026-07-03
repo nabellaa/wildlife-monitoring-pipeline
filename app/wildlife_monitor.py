@@ -35,6 +35,9 @@ from PIL import ImageDraw
 # timestamp
 from datetime import datetime
 
+import time
+from time import perf_counter
+
 # ==================================================
 # Custom Styling, make it look pretty
 # ==================================================
@@ -327,7 +330,6 @@ if (
 # ==================================================
 # Pipeline Execute
 # ==================================================
-import time
 
 st.subheader("Pipeline")
 
@@ -343,6 +345,12 @@ with st.expander("Pipeline Options"):
         value=False
     )
 
+    rebuild_dictionary = st.checkbox(
+        "Rebuild species dictionary (Developer)",
+        value=False,
+        help="Rebuilds the species dictionary and repopulates taxonomy from reviewed datasets."
+    )
+
 progress_bar = st.progress(0)
 
 status = st.empty()
@@ -355,13 +363,43 @@ if st.button("▶ Run Pipeline"):
         print(f"[PIPELINE] {current}/{total} - {script}")
 
     try:
+
+        # Rebuild Species Dictionary (Developer)
+        if rebuild_dictionary:
+            status.info("Rebuilding Species Dictionary...")
+            start = perf_counter()
+
+            for script in [
+                "script07_build_dictionary.py",
+                "species_lookup.py"
+            ]:
+
+                result = subprocess.run(
+
+                    [
+                        sys.executable,
+                        str(PROJECT_ROOT / "scripts" / script)
+                    ],
+
+                    cwd=PROJECT_ROOT,
+                    capture_output=True,
+                    text=True
+                )
+
+                if result.returncode != 0:
+                    raise RuntimeError(
+                        f"{script}\n\n{result.stderr}"
+                    )
+            duration = perf_counter() - start
+
             
-        if reset_queue:
+        elif reset_queue:
             duration = run_pipeline_from(
                 deployment=deployment,
                 start_from=5,
                 progress_callback=update_progress
             )
+
         else:
             duration = run_pipeline(
                 deployment=deployment,
@@ -397,7 +435,7 @@ if st.button("▶ Run Pipeline"):
 # ==================================================
 # Build Master Dataset
 # ==================================================
-if st.button("📦 Build Master Dataset"):
+if st.button("Build Master Dataset"):
 
     script = (
         PROJECT_ROOT /
@@ -689,6 +727,8 @@ if dataset is not None:
         # ==================================================
         # Save Button
         # ==================================================
+        from scripts.species_lookup import get_species_information
+        from scripts.species_lookup import save_species_to_dictionary
 
         col_save, col_undo = st.columns(2)
 
@@ -736,43 +776,7 @@ if dataset is not None:
                 dataset.loc[mask, "review_status"] = "Reviewed"
                 dataset.loc[mask, "review_required"] = False
                 dataset.loc[mask, "review_timestamp"] = log_timestamp
-
-                # ==================================================
-                # Copy and fill in Verified Taxonomy
-                # ==================================================
-
-                if (
-                    verified_common_name.strip().lower()
-                    == # avoid lowercase wording
-                    event["prediction_common_name"].strip().lower()
-                ):
-
-                    dataset.loc[mask, "scientific_name"] = (
-                        f"{event['prediction_genus']} "
-                        f"{event['prediction_species']}"
-                    ).strip()
-
-                    dataset.loc[mask, "scientific_name"] = (
-                        f"{event['prediction_genus']} "
-                        f"{event['prediction_species']}"
-                    ).strip()
-
-                    dataset.loc[mask, "taxonomy_class"] = event["prediction_class"]
-                    dataset.loc[mask, "taxonomy_order"] = event["prediction_order"]
-                    dataset.loc[mask, "taxonomy_family"] = event["prediction_family"]
-                    dataset.loc[mask, "taxonomy_genus"] = event["prediction_genus"]
-                    dataset.loc[mask, "taxonomy_species"] = event["prediction_species"]
-
-                else:
-
-                    dataset.loc[mask, "scientific_name"] = ""
-
-                    dataset.loc[mask, "taxonomy_class"] = ""
-                    dataset.loc[mask, "taxonomy_order"] = ""
-                    dataset.loc[mask, "taxonomy_family"] = ""
-                    dataset.loc[mask, "taxonomy_genus"] = ""
-                    dataset.loc[mask, "taxonomy_species"] = ""
-
+                   
                 # save CSV 
                 dataset.to_csv(DATASET_PATH, index=False)  
 
@@ -792,9 +796,24 @@ if dataset is not None:
                 review_log.to_csv(REVIEW_LOG_PATH, index=False)
 
                 # ==================================================
+                # Lookup Verified Taxonomy
+                # ==================================================
+                current_row = dataset.loc[mask].iloc[0]
+                species = get_species_information(verified_common_name, prediction=current_row)
+                
+                # Always update dataset
+                dataset.loc[mask, "scientific_name"] = species["scientific_name"]
+
+                dataset.loc[mask, "taxonomy_class"] = species["taxonomy_class"]
+                dataset.loc[mask, "taxonomy_order"] = species["taxonomy_order"]
+                dataset.loc[mask, "taxonomy_family"] = species["taxonomy_family"]
+                dataset.loc[mask, "taxonomy_genus"] = species["taxonomy_genus"]
+                dataset.loc[mask, "taxonomy_species"] = species["taxonomy_species"]
+                
+                # ==================================================
                 # Update Species Dictionary
                 # ==================================================
-
+                # Only update dictionary if taxonomy exists
                 species_dict = pd.read_csv(DICTIONARY_PATH)
 
                 existing_species = (
@@ -806,12 +825,12 @@ if dataset is not None:
                 )
 
                 if (
-                    verified_common_name.strip().lower()
+                    verified_common_name.strip().casefold()
                     not in existing_species
                 ):
 
-                    # species id in the dicitonary 
-                    # # if else for avoid erorr when delete any
+                    # generate species id in the dicitonary 
+                    # if else for avoid erorr when delete any
                     if species_dict.empty:
                         next_number = 1
 
@@ -826,26 +845,28 @@ if dataset is not None:
 
                     next_id = f"SP{next_number:04d}"
 
-                    # Read the verified taxonomy from the dataset we just saved
-                    new_data = dataset.loc[mask].iloc[0]
-
+                    # Read the verified taxonomy from the dataset 
+                    # we just saved
                     new_row = pd.DataFrame([{
 
-                        "species_id": next_id,
-                        "common_name": verified_common_name,
+                            "species_id": next_id,
 
-                        "scientific_name": new_data["scientific_name"],
-                        "taxonomy_class": new_data["taxonomy_class"],
-                        "taxonomy_order": new_data["taxonomy_order"],
-                        "taxonomy_family": new_data["taxonomy_family"],
-                        "taxonomy_genus": new_data["taxonomy_genus"],
-                        "taxonomy_species": new_data["taxonomy_species"],
+                            "common_name": species["common_name"],
 
-                        "source": "SpeciesNet",
-                        "first_seen": log_timestamp
+                            "scientific_name": species["scientific_name"],
 
-                    }])
+                            "taxonomy_class": species["taxonomy_class"],
+                            "taxonomy_order": species["taxonomy_order"],
+                            "taxonomy_family": species["taxonomy_family"],
+                            "taxonomy_genus": species["taxonomy_genus"],
+                            "taxonomy_species": species["taxonomy_species"],
 
+                            "taxonomy_source": species["taxonomy_source"],
+
+                            "status": "Verified"
+
+                        }])
+            
                     species_dict = pd.concat(
                         [species_dict, new_row],
                         ignore_index=True
@@ -855,10 +876,22 @@ if dataset is not None:
                         DICTIONARY_PATH,
                         index=False
                     )
-        
-                st.session_state["review_saved"] = True
-                st.rerun()
+                # ==================================================
+                # Save Dataset
+                # ==================================================
+                
+                dataset.to_csv(
+                    DATASET_PATH,
+                    index=False
+                )
 
+                # debug
+                # st.write(species)
+                # st.stop()
+
+                st.session_state["review_saved"] = True
+                st.rerun()        
+                
         # ==================================================
         # Undo feature
         # ==================================================
@@ -893,7 +926,7 @@ if dataset is not None:
         # ==================================================
         # review saved data
         # ==================================================
-
+        
         st.subheader("Saved Preview")
 
         if st.session_state["undo_stack"]:

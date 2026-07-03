@@ -19,6 +19,9 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from config.deployments import get_deployments
 
+from scripts.species_lookup import get_species_information
+
+
 from config.paths import (
     get_deployment_paths,
     MASTER_DATASET,
@@ -30,21 +33,116 @@ from config.paths import (
 # Build Master Dataset
 # ==================================================
 
+# AUTO-FILL TAXONOMY HERE
+taxonomy_columns = [
+
+        "scientific_name",
+
+        "taxonomy_class",
+        "taxonomy_order",
+        "taxonomy_family",
+        "taxonomy_genus",
+        "taxonomy_species",
+
+        "taxonomy_source"
+
+    ]
+    
 all_data = []
 
 for deployment in get_deployments():
     paths = get_deployment_paths(deployment)
     dataset_file = paths["dataset"]
 
-    if dataset_file.exists():
-        df = pd.read_csv(dataset_file)
-        # keep deployment information
-        df.insert(
-        0,
-        "deployment",
-        deployment
+    if not dataset_file.exists():
+        continue
+
+    df = pd.read_csv(dataset_file)
+
+    # Keep deployment information
+    df.insert(0, "deployment", deployment)
+
+    # ==================================================
+    # Auto-fill Verified Species
+    # ==================================================
+
+    mask = (
+
+        (df["review_required"] == False)
+
+        &
+
+        (
+            df["verified_common_name"]
+            .fillna("")
+            .str.strip()
+            == ""
+        )
+
+        &
+
+        (df["prediction_rank"] == "Species")
+
+        &
+
+        (
+            df["prediction_common_name"]
+            .fillna("")
+            .str.strip()
+            != ""
+        )
+
     )
 
+    df.loc[
+        mask,
+        "verified_common_name"
+    ] = df.loc[
+        mask,
+        "prediction_common_name"
+    ]
+
+    for i, row in df.iterrows():
+
+        # Skip if taxonomy already exists
+        if (
+            pd.notna(row["scientific_name"])
+            and str(row["scientific_name"]).strip() != ""
+        ):
+            continue
+
+        # Determine which species name to lookup
+        if (
+            pd.notna(row["verified_common_name"])
+            and str(row["verified_common_name"]).strip() != ""
+        ):
+            species_name = row["verified_common_name"]
+
+        elif (
+            row["prediction_rank"] == "Species"
+            and pd.notna(row["prediction_common_name"])
+            and str(row["prediction_common_name"]).strip() != ""
+        ):
+            species_name = row["prediction_common_name"]
+
+        else:
+            continue
+
+        # Build SpeciesNet prediction dictionary
+        prediction = row.to_dict()
+        
+        # Lookup taxonomy
+        species = get_species_information(
+            species_name, 
+            prediction=prediction
+        )
+
+        # Fill taxonomy fields
+        for column in taxonomy_columns:
+            df.loc[i, column] = species[column]
+
+        
+    # Master Timestamp
     df.insert(
         1,
         "master_updated",

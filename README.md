@@ -7,7 +7,7 @@
 
 An AI-assisted end-to-end wildlife monitoring system that transforms camera trap images into a structured, review-ready, and analytics-ready ecological dataset.
 
-Built on real fieldwork data — **~86,000 camera trap images** collected over **187 days across 4 sites** at Mount Khantan, Perak, Malaysia.
+Built on real fieldwork data of **~86,000 camera trap images** collected over **187 days across 4 sites** at Mount Khantan, Perak, Malaysia.
 
 ---
 
@@ -114,6 +114,8 @@ script05_merge_species_results.py  — Merge detection + classification outputs
         ↓
 script06_build_review_queue.py — Flag low-confidence and unknown predictions
         ↓
+species_lookup.py                  — Auto-enrich species with taxonomy data
+        ↓
 wildlife_monitor.py            — Streamlit human-in-the-loop review UI
         ↓
 script08_backup_manager.py     — Session backup and state management
@@ -144,7 +146,7 @@ scripts/
 ├── script06_build_review_queue.py
 ├── script08_backup_manager.py
 ├── script09_build_master_dataset.py
-├── species_lookup.py          ⭐ In progress — IUCN + taxonomy enrichment
+├── species_lookup.py          — Taxonomy enrichment
 ├── pipeline_runner.py         — Central pipeline execution controller
 ```
 
@@ -179,25 +181,31 @@ scripts/
   - Conflicting AI outputs
 - Prioritize images for manual verification
 
-### 7. Human-in-the-Loop Review System (Streamlit)
+### 7. Species Enrichment (species_lookup.py)
+- Automatically look up blank or new species entries
+- Enriches dataset with:
+  - Full taxonomy (class → order → family → genus → species)
+- Ensures no species record is left with incomplete ecological metadata
+
+### 8. Human-in-the-Loop Review System (Streamlit)
 - Species verification dropdown with dynamic "Other…" custom input
 - Event-based image navigation with bounding box overlay
 - Session-based undo stack — snapshot before every change, safe rollback
 - Full dataset backup per session
 - Dynamic species dictionary — auto-updates as new species are added during review
 
-### 8. Review Logging
+### 9. Review Logging
 - Tracks every review action:
   - Original AI prediction
   - Human correction
   - Timestamp and event_id
 - Enables complete audit trail of all verification decisions
 
-### 9. Master Dataset Builder
+### 10. Master Dataset Builder
 - Aggregates all reviewed deployment outputs into a unified master dataset
 - Standardizes schema and adds deployment metadata across runs
 
-### 10. Clean Dataset Output
+### 11. Clean Dataset Output
 - Final analysis-ready dataset after taxonomy normalization, deduplication, and review reconciliation
 
 ---
@@ -241,16 +249,17 @@ scripts/
 # Current Development Status
 
 ```
-██████████████████░░  90%
+████████████████████░  95%
 ```
 
-### ✅ Completed
+### Completed
 - Data audit layer
 - MegaDetector detection pipeline
 - SpeciesNet classification pipeline
 - Detection dataset builder
 - Merge results layer
 - Review queue system
+- Species enrichment (species_lookup.py) taxonomy auto-fill
 - Streamlit review interface
 - Undo system (session-based snapshot rollback)
 - Backup system (per-session dataset + log backup)
@@ -262,10 +271,7 @@ scripts/
 - Master dataset builder (script09)
 - Clean dataset generation
 
-### 🟡 In Progress
-- `species_lookup.py` — automatic taxonomy enrichment (IUCN status, population level, full taxonomy auto-fill for new species)
-
-### 🔜 Next Phase — Intelligence Layer
+### Next Phase — Intelligence Layer
 **Dashboard** (Power BI / Python):
 - Overall statistics
 - Deployment summary

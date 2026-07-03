@@ -14,32 +14,53 @@ datasets and future projects.
 # ==================================================
 import pandas as pd
 from pathlib import Path
+import sys
 
 # =================================================
 # 2. File Paths
 # ==================================================
-import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
+from scripts.species_lookup import get_species_information
+
 from config.paths import (
     DATASET_PATH,
-    DICTIONARY_PATH
+    DICTIONARY_PATH,
+    MASTER_DATASET
 )
 
 # ==================================================
 # 3. Load Data
 # ==================================================
-print("Loading Wildlife Dataset...")
-dataset = pd.read_csv(DATASET_PATH)
+from config.deployments import get_deployments
+from config.paths import get_deployment_paths
+
+all_data = []
+
+for deployment in get_deployments():
+    paths = get_deployment_paths(deployment)
+    dataset_file = paths["dataset"]
+
+    if not dataset_file.exists():
+        continue
+
+    dataset = pd.read_csv(dataset_file)
+    all_data.append(dataset)
+
+if not all_data:
+    print("No deployment datasets found.")
+    sys.exit()
+
+# combine all deployments into one
+dataset = pd.concat(all_data, ignore_index=True)
 
 # ==================================================
 # 4. Select Best Available Species Name
 # ==================================================
-print("Selecting Best Available Species...")
 
 # Use the best available species label.
 dataset["best_common_name"] = (
@@ -63,31 +84,34 @@ dataset.loc[mask, "best_common_name"] = dataset.loc[
     "classifier_common_name"
 ]
 
+# Keep Only Species-Level Detections
+
+dataset = dataset[
+    # human verified — trust regardless of rank
+    (
+        dataset["verified_common_name"]
+        .fillna("")
+        .str.strip()
+        != ""
+    )
+    |
+    # SpeciesNet reached species level
+    (
+        dataset["prediction_rank"] == "Species"
+    )
+].copy()
+
 # ==================================================
 # 5. Remove Empty Species
 # ==================================================
-print("Removing Empty Species...")
 
 dictionary = dataset[
     dataset["best_common_name"] != ""
 ].copy()
 
 # ==================================================
-# 6. Remove AI Placeholder Labels
-# ==================================================
-
-print("Keeping Species-Level Predictions Only...")
-
-dictionary = dictionary[
-    (dictionary["verified_common_name"].fillna("") != "")
-    |
-    (dictionary["prediction_rank"] == "Species")
-]
-
-# ==================================================
 # 7. Removing Non-Wildlife Labels
 # ==================================================
-print("Removing Non-Wildlife Labels...")
 
 INVALID_SPECIES = [
     "No Cv Result",
@@ -99,8 +123,6 @@ dictionary = dictionary[
         INVALID_SPECIES
     )
 ]
-
-
 
 # ==================================================
 # 7. Remove Duplicate Species
@@ -120,13 +142,12 @@ dictionary = dictionary.sort_values(
 # 9. Create Species IDs
 # ==================================================
 dictionary["species_id"] = [
-
+    
     f"SP{i:04d}"
 
     for i in range(
         1,
         len(dictionary) + 1
-
     )
 
 ]
@@ -135,29 +156,46 @@ dictionary["species_id"] = [
 # 10. Build Species Dictionary
 # ==================================================
 
-species_dictionary = pd.DataFrame({
+species_rows = []
 
-    "species_id": dictionary["species_id"],
-    "common_name": dictionary["best_common_name"],
-    "scientific_name": "",
-    "taxonomy_class": "",
-    "taxonomy_order": "",
-    "taxonomy_family": "",
-    "taxonomy_genus": "",
-    "taxonomy_species": "",
-    "status": "Draft"
+for index, (_, row) in enumerate(dictionary.iterrows(), start=1):
 
-})
+    species = get_species_information(
+        row.best_common_name,
+        prediction=row.to_dict()
+    )
+
+    species["species_id"] = f"SP{index:04d}"
+    species["status"] = "Verified"
+
+    species_rows.append(species)
+
+species_dictionary = pd.DataFrame(species_rows)
 
 # ==================================================
 # 11. Save Species Dictionary
 # ==================================================
+
+# created species dictionary CSV file column fix
+species_dictionary = species_dictionary[[
+    "species_id",
+    "common_name",
+    "scientific_name",
+    "taxonomy_class",
+    "taxonomy_order",
+    "taxonomy_family",
+    "taxonomy_genus",
+    "taxonomy_species",
+    "iucn_status",
+    "population_trend",
+    "taxonomy_source",
+    "iucn_source",
+    "status"
+]]
+
 species_dictionary.to_csv(
-
     DICTIONARY_PATH,
-
     index=False
-
 )
 
 # ==================================================
