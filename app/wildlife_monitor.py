@@ -237,14 +237,7 @@ from config.paths import (
 from scripts.pipeline_runner import run_pipeline, run_pipeline_from 
 
 # Backup Once Per Session
-from scripts.script08_backup_manager import create_backup
-
-# pick folder to run pipeline
-from config.deployments import (
-    get_deployments,
-    get_deployment_path
-)
-
+from scripts.script07_backup_manager import create_backup
 
 # ==================================================
 # 4. Configure Review App
@@ -263,6 +256,12 @@ st.write("Review AI predictions and verify wildlife species.")
 # ==================================================
 # Deployment Selection
 # ==================================================
+# pick folder to run pipeline
+from config.deployments import (
+    get_deployments,
+    get_deployment_path,
+    summarize_deployment
+)
 
 deployments = get_deployments()
 
@@ -270,19 +269,29 @@ if not deployments:
     st.error("No deployment folders found.")
     st.stop()
 
-if "deployment" not in st.session_state:
-    st.session_state["deployment"] = deployments[0]
+st.subheader("Deployments")
 
-deployment = st.selectbox(
-    "Deployment",
-    deployments,
-    index=deployments.index(
-        st.session_state["deployment"]
-    )
+# Build summary table with checkboxes
+with st.expander("Select Deployments", expanded=True):
 
-)
+    selected_deployments = []
 
-st.session_state["deployment"] = deployment
+    for dep in deployments:
+        summary = summarize_deployment(dep)
+
+        checked = st.checkbox(
+            f"{dep} — {summary['image_count']} images",
+            key=f"dep_{dep}"
+        )
+
+        if checked:
+            selected_deployments.append(dep)
+
+if not selected_deployments:
+    st.info("Select a deployment above to continue.")
+    st.stop()
+
+deployment = selected_deployments[0]  
 
 # ==================================================
 # 3. Load Dataset
@@ -295,17 +304,16 @@ DATASET_PATH = paths["dataset"]
 REVIEW_LOG_PATH = paths["review_log"]
 
 if DATASET_PATH.exists():
-
+    print(f"Inside None block - DATASET_PATH: {DATASET_PATH}")
+    print(f"Inside None block - exists: {DATASET_PATH.exists()}")
     dataset = pd.read_csv(DATASET_PATH)
-
+    print(f"Dataset loaded: {len(dataset)} rows")
 else:
-
     dataset = None
+    print(f"No dataset found at {DATASET_PATH}")
 
-    st.info(
-        "No processed dataset found.\n\n"
-        "Run the pipeline to create one."
-    )
+print(f"Dataset is None: {dataset is None}")
+print(f"Dataset type: {type(dataset)}")
 
 species_dict = pd.read_csv(DICTIONARY_PATH)
 
@@ -330,6 +338,7 @@ if (
 # ==================================================
 # Pipeline Execute
 # ==================================================
+from utils.pipeline_status import save_pipeline_status, load_pipeline_status
 
 st.subheader("Pipeline")
 
@@ -416,11 +425,18 @@ if st.button("▶ Run Pipeline"):
             f"{seconds} sec"
         )
 
+        # save pipeline status
+        save_pipeline_status(
+            deployment=deployment,
+            duration_seconds=duration,
+            images_processed=len(dataset) if dataset is not None else 0
+        )
+
         # Reload dataset after pipeline
         if DATASET_PATH.exists():
             dataset = pd.read_csv(DATASET_PATH)
             st.session_state["dataset"] = dataset
-
+            
         time.sleep(2)
 
         st.rerun()
@@ -458,53 +474,80 @@ if st.button("Build Master Dataset"):
     else:
         st.error(result.stderr)
 
-# ==================================================
-# Review Interface event no deploy
-# ==================================================
-if dataset is not None:
 
-    # ==================================================
-    # 6. Dataset Summary
-    # ==================================================
-    st.divider()
+print(f"Right before summary - dataset is None: {dataset is None}")
+print(f"Right before summary - DATASET_PATH: {DATASET_PATH}")
+print(f"Right before summary - DATASET_PATH exists: {DATASET_PATH.exists()}")
+# ==================================================
+# 6. Dataset Summary
+# ==================================================
+st.divider()
+
+col1, col2, col3 = st.columns(3)
+
+if dataset is None:
+
+    col1.metric("Total Images", 0)
+    col2.metric("Review Required", 0)
+    col3.metric("Reviewed", 0)
+
+    if paths["megadetector_json"].exists():
+        st.info("Pipeline ran but no animals were detected.")
+    else:
+        st.info(
+            "Pipeline has not been run yet. "
+            "Run the pipeline to process images."
+        )
+
+    st.stop()
+
+else:
 
     total_images = len(dataset)
-    review_required = dataset["review_required"].sum()
-    reviewed = (dataset["review_status"] == "Reviewed").sum()
 
-    # ==================================================
-    # 7. Display summary metrics in columns.
-    # ==================================================
+    review_required = (
+        dataset["review_required"].sum()
+        if "review_required" in dataset.columns
+        else 0
+    )
 
-    col1, col2, col3 = st.columns(3)
+    reviewed = (
+        (dataset["review_status"] == "Reviewed").sum()
+        if "review_status" in dataset.columns
+        else 0
+    )
 
     col1.metric("Total Images", total_images)
     col2.metric("Review Required", review_required)
     col3.metric("Reviewed", reviewed)
 
-    # Divider
-    st.divider()
+# Divider
+st.divider()
 
-    # ==================================================
-    # 9. Review Queue
-    # ==================================================
+# ==================================================
+# 9. Review Queue
+# ==================================================
+if dataset is None or "review_required" not in dataset.columns:
+    st.warning("No dataset available for review.")
+    st.stop()
 
-    review_queue = (
-        dataset[dataset["review_required"]]
-        ["event_id"]
-        .drop_duplicates()
-        .sort_values()
-        .tolist()
-    )
+review_queue = (
+    dataset[dataset["review_required"]]
+    ["event_id"]
+    .drop_duplicates()
+    .sort_values()
+    .tolist()
+)
 
-    # Review Progress
-    st.subheader(f"Queue — {len(review_queue)} remaining")
+# Review Progress
+st.subheader(f"Queue — {len(review_queue)} remaining")
 
-    # Check Remaining Reviews
-    if not review_queue :
-        st.balloons()
-        st.success("All events reviewed.")
-        st.stop()
+# Check Remaining Reviews
+if not review_queue :
+    st.success("All events reviewed.")
+    #st.stop()
+
+if review_queue:
 
     # ==================================================
     # initialise all session state here, before anything else to avoid indentation error
@@ -727,8 +770,8 @@ if dataset is not None:
         # ==================================================
         # Save Button
         # ==================================================
-        from scripts.species_lookup import get_species_information
-        from scripts.species_lookup import save_species_to_dictionary
+        from utils.species_lookup import get_species_information
+        from utils.species_lookup import save_species_to_dictionary
 
         col_save, col_undo = st.columns(2)
 
@@ -776,7 +819,7 @@ if dataset is not None:
                 dataset.loc[mask, "review_status"] = "Reviewed"
                 dataset.loc[mask, "review_required"] = False
                 dataset.loc[mask, "review_timestamp"] = log_timestamp
-                   
+                    
                 # save CSV 
                 dataset.to_csv(DATASET_PATH, index=False)  
 
@@ -799,7 +842,10 @@ if dataset is not None:
                 # Lookup Verified Taxonomy
                 # ==================================================
                 current_row = dataset.loc[mask].iloc[0]
-                species = get_species_information(verified_common_name, prediction=current_row)
+                species = get_species_information(
+                    verified_common_name,
+                    prediction=current_row.to_dict()
+                )
                 
                 # Always update dataset
                 dataset.loc[mask, "scientific_name"] = species["scientific_name"]
@@ -948,23 +994,23 @@ if dataset is not None:
 
         else:
             st.info("No recent changes yet.")
-        
-    # ==================================================
-    # BLOCK 2 — Event Information ---- already shown on photo---
-    # ==================================================
+            
+        # ==================================================
+        # BLOCK 2 — Event Information ---- already shown on photo---
+        # ==================================================
 
-    #col1, col2 = st.columns(2)
+        #col1, col2 = st.columns(2)
 
-    #with col1:
-    #    st.markdown(f"**Folder** &nbsp; `{event['folder_name']}`")
-    #   st.markdown(f"**Event** &nbsp; `{event['event_number']}`")
-    #    st.markdown(f"**Captured** &nbsp; `{event['capture_datetime']}`")
+        #with col1:
+        #    st.markdown(f"**Folder** &nbsp; `{event['folder_name']}`")
+        #   st.markdown(f"**Event** &nbsp; `{event['event_number']}`")
+        #    st.markdown(f"**Captured** &nbsp; `{event['capture_datetime']}`")
 
-    #with col2:
-    #    st.markdown(f"**Temperature** &nbsp; `{event['temperature_c']} °C`")
-    #    st.markdown(f"**Moon phase** &nbsp; `{event['moon_phase']}`")
+        #with col2:
+        #    st.markdown(f"**Temperature** &nbsp; `{event['temperature_c']} °C`")
+        #    st.markdown(f"**Moon phase** &nbsp; `{event['moon_phase']}`")
 
-    #st.divider()
+        #st.divider()
 
     # BLOCK 3 AI Prediction Summary
     st.divider()
@@ -1034,3 +1080,48 @@ if dataset is not None:
     with col_confidence:
         st.subheader("Confidence")
         st.metric("Average Prediction Confidence", f"{average_score:.2%}")
+
+
+# BLOCK 5 — Species Overview
+st.divider()
+
+st.subheader("Species Overview")
+
+# Species Bar Chart
+species_counts = (
+    dataset["verified_common_name"]
+    .fillna(dataset["prediction_common_name"])
+    .value_counts()
+)
+
+st.bar_chart(species_counts)
+
+# Expandable Species Gallery
+st.subheader("Species Gallery")
+
+species_list = species_counts.index.tolist()
+
+selected_species = st.selectbox(
+    "Select Species",
+    species_list
+)
+
+species_data = dataset[
+    dataset["verified_common_name"].fillna(
+        dataset["prediction_common_name"]
+    ) == selected_species
+]
+
+# display images for selected species
+st.write(f"Total Images: {len(species_data)}")
+
+gallery = species_data.sample(
+    min(12, len(species_data)),
+    random_state=42
+)
+
+cols = st.columns(4)
+
+for i, (_, row) in enumerate(gallery.iterrows()):
+    with cols[i % 4]:
+        st.image(row["image_path"], use_container_width=True)

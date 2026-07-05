@@ -43,13 +43,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
     
 from config.paths import (
-    SAMPLE_PATH,
-    get_deployment_paths
+    get_deployment_paths,
 )
 
 deployment = sys.argv[1]
 paths = get_deployment_paths(deployment)
-sample_folder = SAMPLE_PATH / deployment
+input_folder = paths["input_folder"]
 
 # ==================================================
 # 3. Output Paths
@@ -62,9 +61,16 @@ output_file = paths["megadetector_json"]
 # 4. Find Photos
 # ==================================================
 
-jpg_files = list(sample_folder.glob("*.JPG"))
+image_extensions = {".jpg", ".jpeg", ".png"}
+
+jpg_files = list({
+    p.resolve()
+    for p in input_folder.rglob("*")
+    if p.is_file() and p.suffix.lower() in image_extensions
+})
 
 print(f"Photos found: {len(jpg_files)}")
+print(f"Unique files: {len(set(jpg_files))}")
 
 
 # ==================================================
@@ -118,6 +124,9 @@ print("MegaDetector finished.")
 # ==================================================
 # 7. Save Results
 # ==================================================
+if not results:
+    print("No detections returned.")
+    sys.exit(0)
 
 print(type(results))
 print(type(results[0]))

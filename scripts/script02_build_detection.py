@@ -160,10 +160,13 @@ for image in results:
         key=lambda d: d["conf"]
     )
 
+    image_path = Path(image["file"])
+    
     row = {
         "image_path": image["file"],
-        "file_name": Path(image["file"]).name,
-        "folder_name": Path(image["file"]).parent.name,
+        "file_name": image_path.name,
+        "folder_name": image_path.parent.name,
+        "camera_name":   image_path.parent.parent.name,
 
         "capture_datetime": capture_datetime,
         "temperature_c": temperature,

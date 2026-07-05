@@ -6,6 +6,7 @@
 
 import pandas as pd
 from pathlib import Path
+import os
 
 # ==================================================
 # 2. File Paths
@@ -27,20 +28,33 @@ INPUT_FILE = paths["dataset"]
 # 3. Load Wildlife Dataset
 # ==================================================
 
-print("Loading Wildlife Dataset...")
+# SAFE CHECK: file exists
+if not os.path.exists(INPUT_FILE):
+    print("No dataset file found. Skipping review queue build.")
+    sys.exit(0)
 
-dataset = pd.read_csv(INPUT_FILE)
+# SAFE LOAD CSV
+try:
+    dataset = pd.read_csv(INPUT_FILE)
+except pd.errors.EmptyDataError:
+    print("Dataset is empty. Skipping review queue build.")
+    sys.exit(0)
 
-print(f"Images Loaded : {len(dataset)}")
+# SAFE CHECK: dataset is not empty
+if dataset.empty:
+    print("Dataset is empty. Skipping review queue build.")
+    sys.exit(0)
 
 # ==================================================
 # 4. Generate Event ID
 # ==================================================
 
-print("Generating Event IDs...")
-
 dataset["event_id"] = (
     dataset["folder_name"]
+    + "_"
+    + dataset["camera_name"]
+    + "_"
+    + dataset["folder_name"]
     + "_"
     + dataset["event_number"].astype(str)
 )
@@ -68,8 +82,6 @@ def flag_for_review(dataset, mask):
 # 6. Rule 1 - Species-Level Prediction
 # ==================================================
 
-print("Applying Review Rule 1...")
-
 mask = (
     dataset["prediction_species"].isna()
     | (dataset["prediction_species"] == "")
@@ -80,8 +92,6 @@ flag_for_review(dataset,mask,)
 # ==================================================
 # 7. Rule 2 - Mixed Predictions Within Event
 # ==================================================
-
-print("Applying Review Rule 2...")
 
 mask = dataset["prediction_rank"] != "Species"
 
@@ -94,17 +104,11 @@ flag_for_review(
 # 7. Rule 3 - Low prediction confidence
 # ==================================================
 
-print("Applying Review Rule 3...")
-
 LOW_PREDICTION_CONFIDENCE = 0.80
 
 mask = dataset["prediction_score"] < LOW_PREDICTION_CONFIDENCE
 
 flag_for_review(dataset,mask,)
-
-#debug
-print(dataset["prediction_score"].dtype)
-print(dataset["prediction_score"].head())
 
 # ==================================================
 # 8. Save Updated Dataset

@@ -23,31 +23,31 @@ def get_pipeline(deployment):
     return [
 
         {
-            "script": "script02_run_megadetector.py",
+            "script": "script01_run_megadetector.py",
             "name": "Running MegaDetector",
             "output": paths["megadetector_json"]
         },
 
         {
-            "script": "script03_build_detection.py",
+            "script": "script02_build_detection.py",
             "name": "Building Detection Dataset",
             "output": paths["detection_csv"]
         },
 
         {
-            "script": "script04_run_speciesnet.py",
+            "script": "script03_run_speciesnet.py",
             "name": "Running SpeciesNet",
             "output": paths["speciesnet_json"]
         },
 
         {
-            "script": "script05_merge_species_results.py",
+            "script": "script04_merge_species_results.py",
             "name": "Merging Species Results",
             "output": paths["dataset"]
         },
 
         {
-            "script": "script06_build_review_queue.py",
+            "script": "script05_build_review_queue.py",
             "name": "Building Review Queue",
             "output": paths["dataset"]
         }
@@ -123,22 +123,11 @@ def run_pipeline(
 
         if result.returncode != 0:
             raise RuntimeError(
-                f"""
-        Step Failed:
-        {step['name']}
-
-        Script:
-        {step['script']}
-
-        Deployment:
-        {deployment}
-
-        STDERR:
-        {result.stderr}
-
-        STDOUT:
-        {result.stdout}
-        """
+                f"Step Failed: {step['name']}\n\n"
+                f"Script: {step['script']}\n\n"
+                f"Deployment: {deployment}\n\n"
+                f"STDERR:\n{result.stderr}\n\n"
+                f"STDOUT:\n{result.stdout}"
             )
         
     duration = perf_counter() - start_time
@@ -190,9 +179,59 @@ def run_pipeline_from(
 
         if result.returncode != 0:
             raise RuntimeError(
-                f"{step['name']}\n\n"
-                f"{result.stderr}"
+                f"{step['name']}\n\n{result.stderr}"
             )
 
     duration = perf_counter() - start_time
     return duration
+
+# ==================================================
+# Run Batch Pipeline
+# ==================================================
+
+def run_batch_pipeline(
+    deployments,
+    skip_completed=False,
+    progress_callback=None
+):
+    """
+    Run the full pipeline for multiple deployments.
+    Returns a dict of deployment: duration.
+    """
+
+    results   = {}
+    start_time = perf_counter()
+
+    for deployment in deployments:
+
+        if progress_callback:
+            progress_callback(
+                deployment=deployment,
+                message=f"Starting {deployment}"
+            )
+
+        try:
+            duration = run_pipeline(
+                deployment=deployment,
+                skip_completed=skip_completed,
+                progress_callback=lambda c, t, s: (
+                    progress_callback(
+                        deployment=deployment,
+                        message=s
+                    )
+                    if progress_callback else None
+                )
+            )
+
+            results[deployment] = {
+                "status":   "done",
+                "duration": duration
+            }
+
+        except Exception as error:
+            results[deployment] = {
+                "status": "failed",
+                "error":  str(error)
+            }
+
+    return results

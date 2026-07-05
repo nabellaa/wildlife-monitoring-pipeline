@@ -25,24 +25,30 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
-from scripts.species_lookup import get_species_information
+from utils.species_lookup import get_species_information
 
 from config.paths import (
-    DATASET_PATH,
-    DICTIONARY_PATH,
-    MASTER_DATASET
+    DICTIONARY_PATH
 )
 
 # ==================================================
 # 3. Load Data
 # ==================================================
-from config.deployments import get_deployments
-from config.paths import get_deployment_paths
+from config.deployments import summarize_deployment
+from config.paths import get_deployment_paths, OUTPUT_PATH
 
 all_data = []
 
-for deployment in get_deployments():
-    paths = get_deployment_paths(deployment)
+for deployment_folder in sorted(OUTPUT_PATH.iterdir()):
+
+    if not deployment_folder.is_dir():
+        continue
+
+    # skip master folder
+    if deployment_folder.name == "master":
+        continue
+
+    paths = get_deployment_paths(deployment_folder.name)
     dataset_file = paths["dataset"]
 
     if not dataset_file.exists():

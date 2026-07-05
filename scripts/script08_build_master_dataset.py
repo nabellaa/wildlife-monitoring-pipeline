@@ -19,7 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from config.deployments import get_deployments
 
-from scripts.species_lookup import get_species_information
+from utils.species_lookup import get_species_information
 
 
 from config.paths import (

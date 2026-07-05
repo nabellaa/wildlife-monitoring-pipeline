@@ -23,6 +23,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 DATA_PATH = PROJECT_ROOT / "data"
 SAMPLE_PATH = DATA_PATH / "sample"
+BATCH_SAMPLE_PATH = DATA_PATH / "batch_sample"
 OUTPUT_PATH = PROJECT_ROOT / "outputs"
 REFERENCE_PATH = PROJECT_ROOT / "reference"
 BACKUP_PATH = PROJECT_ROOT / "backup"
@@ -108,7 +109,10 @@ def get_deployment_paths(deployment):
     """
     Build every output path for one deployment.
     """
+    # INPUT (sample/batch sample /RAW DATA)
+    input_root = BATCH_SAMPLE_PATH / deployment
 
+    # OUTPUT (PROCESSED DATA)
     deployment_root = OUTPUT_PATH / deployment
 
     audit = deployment_root / "audit"
@@ -131,15 +135,21 @@ def get_deployment_paths(deployment):
         )
 
     return {
+        
+        # INPUT
+        "input_folder": input_root,
 
+        # OUTPUT ROOT
         "deployment_root": deployment_root,
 
+        # OUTPUT SUBFOLDERS
         "audit_folder":        audit,
         "megadetector_folder": megadetector,
         "detection_folder":    detection,
         "speciesnet_folder":   speciesnet,
         "processed_folder":    processed,
 
+        # OUTPUT FILES
         "audit_report":      audit / "audit_report.txt",
         "megadetector_json": megadetector / "megadetector_results.json",
         "detection_csv":     detection / "detection_dataset.csv",

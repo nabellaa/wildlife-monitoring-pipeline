@@ -30,7 +30,7 @@ Project:
 import json
 import subprocess
 import sys
-
+import os
 import pandas as pd
 
 from pathlib import Path
@@ -38,8 +38,6 @@ from pathlib import Path
 # ==================================================
 # 2. Settings and Paths
 # ==================================================
-import sys
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 if str(PROJECT_ROOT) not in sys.path:
@@ -56,46 +54,47 @@ OUTPUT_DIR = paths["speciesnet_folder"]
 OUTPUT_FILE = paths["speciesnet_json"]
 
 # ==================================================
-# 3. Read the detection dataset
+# SAFE CHECK: file exists
 # ==================================================
+if not os.path.exists(INPUT_FILE):
+    print("No detection file found. Skipping SpeciesNet.")
+    sys.exit(0)
 
-# Load the detection dataset.
-df = pd.read_csv(INPUT_FILE)
+# ==================================================
+# SAFE LOAD CSV
+# ==================================================
+try:
+    df = pd.read_csv(INPUT_FILE)
+except pd.errors.EmptyDataError:
+    print("Detection file is empty. Skipping SpeciesNet.")
+    sys.exit(0)
 
-# Get image paths for SpeciesNet.
-image_paths = df["image_path"].tolist()
+if df.empty or "image_path" not in df.columns:
+    print("Detection dataset is empty. Skipping SpeciesNet.")
+    sys.exit(0)
 
+# ==================================================
+# Extract images
+# ==================================================
+image_paths = df["image_path"].dropna().tolist()
+
+if len(image_paths) == 0:
+    print("No animals to classify. Skipping SpeciesNet.")
+    sys.exit(0)
+
+# ==================================================
+# Write file list
+# ==================================================
 IMAGE_LIST_FILE = OUTPUT_DIR / "image_paths.txt"
 
 with open(IMAGE_LIST_FILE, "w", encoding="utf-8") as f:
-
     for image_path in image_paths:
         f.write(f"{image_path}\n")
 
-# ==================================================
-# 4. Display summary
-# ==================================================   
-
-print("=" * 40)
-print("Running SpeciesNet")
-print("=" * 40)
-
-print(f"Country Code        : {COUNTRY_CODE}")
-print(f"Images to classify  : {len(image_paths)}")
+print(f"Running SpeciesNet on {len(image_paths)} images")
 
 # ==================================================
-# 5. Skip if nothing to classify
-# ==================================================
-
-if not image_paths:
-
-    print("\nNo detected animals found.")
-    print("SpeciesNet skipped.")
-
-    quit()
-
-# ==================================================
-# 6. Build the SpeciesNet command
+# Build the SpeciesNet command
 # ==================================================
 
 command = [
@@ -114,7 +113,7 @@ command = [
 ]
 
 # ==================================================
-# 7. Run SpeciesNet
+# Run SpeciesNet
 # ==================================================
 
 print("\nRunning SpeciesNet...")

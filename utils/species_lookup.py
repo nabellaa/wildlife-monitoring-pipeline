@@ -302,7 +302,7 @@ def get_species_information(common_name, prediction=None):
         species = gbif_to_species(gbif, common_name)
 
         # if prediction exists but GBIF missing species, optionally override genus/species
-        if prediction:
+        if prediction is not None:
             species["taxonomy_source"] = "SpeciesNet + GBIF"
 
         # save to dictionary
@@ -313,6 +313,8 @@ def get_species_information(common_name, prediction=None):
     # add iucn info
     # ------------------------------------------
 '''
+# remove above save to dictionary and cache, because if the species is not found in GBIF, we should not save it to the dictionary yet. We should only save it when we have a valid scientific name.
+    
     iucn = search_iucn(species["scientific_name"])
 
     if iucn:
@@ -321,6 +323,10 @@ def get_species_information(common_name, prediction=None):
         species["iucn_source"] = "IUCN"
 
     save_species_to_dictionary(species)
-
+    SPECIES_CACHE[key] = species
     return species
+
+    # Nothing found
+    return empty_species_record(common_name)
+
 '''

@@ -31,11 +31,13 @@ The final dataset combines:
 import json
 import pandas as pd
 from pathlib import Path
+import sys
+import os
 
 # ==================================================
 # 2. Paths
 # ==================================================
-import sys
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -50,22 +52,35 @@ detection_file = paths["detection_csv"]
 speciesnet_file = paths["speciesnet_json"]
 output_file = paths["dataset"]
 
+
+# ==================================================
+# SAFE CHECK: file exists
+# ==================================================
+if not os.path.exists(detection_file):
+    print("No detection file found. Skipping merge.")
+    sys.exit(0)
+
+# ==================================================
+# SAFE LOAD CSV
+# ==================================================
+try:
+    dataset = pd.read_csv(detection_file)
+except pd.errors.EmptyDataError:
+    print("Detection dataset is empty. Skipping merge step.")
+    sys.exit(0)
+
+# ==================================================
+# Check if SpeciesNet results exist
+# ==================================================
+if dataset.empty:
+    print("No detections to merge. Skipping step.")
+    sys.exit(0)
+
 # ==================================================
 # 3. Load Data
 # ==================================================
 
-# Load Detection Dataset
-
-print("Loading Detection Dataset...")
-
-dataset = pd.read_csv(detection_file)
-
-print(f"Rows : {len(dataset)}")
-
 # Load SpeciesNet Results
-
-print("Loading SpeciesNet Results...")
-
 with open(speciesnet_file, "r", encoding="utf-8") as f:
     species_results = json.load(f)
 
@@ -158,9 +173,6 @@ def parse_classifier_prediction(item):
 # ==================================================
 # 7. Merge Datasets
 # ==================================================
-
-print("Merging Results...")
-
 for index, row in dataset.iterrows():
 
     # 1. Get image key
