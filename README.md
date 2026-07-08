@@ -34,14 +34,14 @@ Designed for scalable biodiversity monitoring across multiple camera trap deploy
 ### Deployment Manager
 _Select deployment and run the AI pipeline._
 
-![Deployment Manager](docs/images/deployment_pipeline.png)
+![Deployment Manager](docs/images/deployment_manager.png)
 
 ---
 
-### Pipeline & Event Queue
-_View processing status, event queue, and deployment summary._
+### Species Overview
+_Per-deployment species distribution with image gallery and bulk re-review tools._
 
-![Pipeline](docs/images/info_review_queue.png)
+![Prediction](docs/images/species_overview.png)
 
 ---
 
@@ -59,10 +59,10 @@ _Bounding boxes, prediction confidence, taxonomy, and metadata._
 
 ---
 
-### Species Overview
-_Per-deployment species distribution with image gallery and bulk re-review tools._
+### Master Dataset Builder
+_View processing deployment, choose dataset to combine._
 
-*(Add screenshot when available.)*
+![Pipeline](docs/images/build_master_dataset.png)
 
 ---
 
@@ -97,7 +97,21 @@ deployments/
 
 ---
 
-## 2. Master Dataset Layer
+## 2. Analytics Layer
+
+The cleaned dataset is designed for downstream analysis.
+
+Future dashboards include:
+
+- Species distribution
+- Camera performance
+- Deployment comparison
+- Review statistics
+- Ecological summaries
+
+---
+
+## 3. Master Dataset Layer
 
 Reviewed deployments are combined into one standardized dataset.
 
@@ -116,20 +130,6 @@ master_dataset.csv
 
 ---
 
-## 3. Analytics Layer
-
-The cleaned dataset is designed for downstream analysis.
-
-Future dashboards include:
-
-- Species distribution
-- Camera performance
-- Deployment comparison
-- Review statistics
-- Ecological summaries
-
----
-
 # AI Pipeline
 
 The current automated pipeline consists of **three processing stages**.
@@ -138,8 +138,12 @@ The current automated pipeline consists of **three processing stages**.
 Camera Trap Images
         │
         ▼
-script02_run_megadetector.py
+script01_run_megadetector.py
 (Object Detection)
+        │
+        ▼
+script02_run_speciesnet.py
+(Classify Detection)
         │
         ▼
 script03_build_wildlife_dataset.py
@@ -246,7 +250,8 @@ Prediction Accepted?
  │             │
 Auto Verified  Needs Review
  │             │
- │      Human Verification
+Quick         Human
+review      Verification
  │             │
  └──────┬──────┘
         │
