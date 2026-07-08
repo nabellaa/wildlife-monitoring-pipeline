@@ -2,7 +2,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
 ![Pipeline](https://img.shields.io/badge/AI-Pipeline-green)
-![Status](https://img.shields.io/badge/Status-90%25%20Complete-brightgreen)
+![Status](https://img.shields.io/badge/Status-95%25%20Complete-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
 An AI-assisted end-to-end wildlife monitoring system that transforms camera trap images into a structured, review-ready, and analytics-ready ecological dataset.
@@ -20,9 +20,9 @@ The system automatically:
 - Detects wildlife using **MegaDetector**
 - Identifies species using **SpeciesNet**
 - Builds a structured wildlife dataset
-- Automatically enriches taxonomy information
+- Automatically enriches taxonomy information via **species_lookup.py**
 - Flags uncertain predictions for manual verification
-- Provides an interactive Streamlit review interface
+- Provides an interactive Streamlit review interface with **Species Overview** for bulk re-review of auto-verified predictions
 - Generates deployment-level and master datasets ready for ecological analysis
 
 Designed for scalable biodiversity monitoring across multiple camera trap deployments.
@@ -41,7 +41,7 @@ _Select deployment and run the AI pipeline._
 ### Species Overview
 _Per-deployment species distribution with image gallery and bulk re-review tools._
 
-![Prediction](docs/images/species_overview.png)
+![Species Overview](docs/images/species_overview.png)
 
 ---
 
@@ -221,18 +221,18 @@ Every review updates:
 
 ## Species Overview
 
-Each deployment includes a live species summary.
+Each deployment includes a live species summary for quality control.
 
 Features:
 
 - Species frequency bar chart
-- Image gallery by species
+- Image gallery per species
 - Auto-verified species indicator
-- Bulk "Flag All" for re-review
+- **Bulk "Flag All" for re-review** — critical for catching AI mispredictions across an entire species group
 - Individual image flagging
 - Pagination for large datasets
 
-This provides a quick overview of wildlife detected within a deployment before detailed review.
+> This feature was built out of a real need. AI auto-verification was found to produce a significant number of mispredictions. The Species Overview allows reviewers to quickly scan all images grouped by species and bulk-flag suspicious groups for manual re-verification, significantly improving dataset accuracy.
 
 ---
 
@@ -250,8 +250,10 @@ Prediction Accepted?
  │             │
 Auto Verified  Needs Review
  │             │
-Quick         Human
-review      Verification
+Species       Human
+Overview    Verification
+Quality      (Review Queue)
+Check  
  │             │
  └──────┬──────┘
         │
@@ -288,13 +290,12 @@ scripts/
 utils/
 ├── audit.py
 ├── pipeline_status.py
-└── species_lookup.py          — Taxonomy enrichment
+└── species_lookup.py          — Automatic taxonomy enrichment
 
 outputs/
 ├── deployments/
 ├── master/
 └── logs/
-
 ```
 
 ---
@@ -313,10 +314,10 @@ outputs/
 - `classifier_species`, `classifier_common_name`, `classifier_score`
 
 ### Taxonomy
-- `class`, `order`, `family`, `genus`, `species`, `scientific_name`,`common_name`
+- `class`, `order`, `family`, `genus`, `species`, `scientific_name`, `common_name`
 
 ### Human Review Layer
-- `review_status` (Pending / Verified / Corrected / Skipped)
+- `review_status` (Auto Verified / Pending / Verified)
 - `review_required`, `verified_common_name`
 - `reviewer`, `review_notes`, `review_timestamp`
 
@@ -329,6 +330,7 @@ outputs/
 | Language | Python 3.10+ |
 | Data Processing | Pandas, JSON |
 | AI Models | MegaDetector (object detection), SpeciesNet (species classification) |
+| Taxonomy Enrichment | species_lookup.py (GBIF / open taxonomy APIs) |
 | Review Interface | Streamlit |
 | Pipeline Orchestration | pipeline_runner.py (modular script controller) |
 | Data Engineering | ETL pipeline, session state management, audit logging |
@@ -342,14 +344,14 @@ outputs/
 ```
 
 ### Completed
-- Data audit layer
 - MegaDetector detection pipeline
 - SpeciesNet classification pipeline
 - Detection dataset builder
+- Taxonomy enrichment (species_lookup.py)
 - Merge results layer
 - Review queue system
-- Species enrichment (species_lookup.py) taxonomy auto-fill
 - Streamlit review interface
+- Species Overview with bulk re-review flagging
 - Undo system (session-based snapshot rollback)
 - Backup system (per-session dataset + log backup)
 - Review log system (full audit trail)
@@ -357,10 +359,11 @@ outputs/
 - Session state management
 - Dynamic species dictionary (auto-growing)
 - Multi-deployment support
-- Master dataset builder (script09)
+- Master dataset builder (script06)
 - Clean dataset generation
 
-### Next Phase — Intelligence Layer
+### Final Phase — Intelligence Layer
+
 **Dashboard** (Power BI / Python):
 - Overall statistics
 - Deployment summary
@@ -368,9 +371,8 @@ outputs/
 - Confidence scoring trends
 - Review performance metrics
 
-### GIS Integration
-
-- Camera locations
+**GIS Integration**:
+- Camera trap locations
 - Habitat visualization
 - Spatial analysis
 - Species distribution mapping
