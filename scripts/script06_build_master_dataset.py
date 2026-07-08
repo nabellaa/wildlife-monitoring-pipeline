@@ -16,16 +16,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
-
-from config.deployments import get_deployments
-
 from utils.species_lookup import get_species_information
 
-
 from config.paths import (
+    DEPLOYMENTS_OUTPUT,
+    get_deployments,
     get_deployment_paths,
     MASTER_DATASET,
-    CLEAN_DATASET,
     DEPLOYMENT_SUMMARY
 )
 
@@ -50,7 +47,24 @@ taxonomy_columns = [
     
 all_data = []
 
-for deployment in get_deployments():
+# ==================================================
+# Selected Deployments
+# ==================================================
+
+# if deployments passed as args use them
+# otherwise process all
+if len(sys.argv) > 1:
+    selected = sys.argv[1:]
+else:
+    selected = [
+        f.name
+        for f in sorted(DEPLOYMENTS_OUTPUT.iterdir())
+        if f.is_dir()
+    ]
+
+print(f"Building master dataset for: {selected}")
+
+for deployment in selected:
     paths = get_deployment_paths(deployment)
     dataset_file = paths["dataset"]
 

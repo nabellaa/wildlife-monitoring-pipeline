@@ -237,7 +237,7 @@ from config.paths import (
 from scripts.pipeline_runner import run_pipeline, run_pipeline_from 
 
 # Backup Once Per Session
-from scripts.script07_backup_manager import create_backup
+from scripts.script05_backup_manager import create_backup
 
 # ==================================================
 # 4. Configure Review App
@@ -255,6 +255,10 @@ st.write("Review AI predictions and verify wildlife species.")
 
 # ==================================================
 # Deployment Selection
+
+# Currently single selection only.
+# To enable multi-deployment, replace st.radio with
+# the checkbox version and use run_batch_pipeline.
 # ==================================================
 # pick folder to run pipeline
 from config.deployments import (
@@ -272,26 +276,79 @@ if not deployments:
 st.subheader("Deployments")
 
 # Build summary table with checkboxes
+deployment_options = {
+    dep: f"{dep} — {summarize_deployment(dep)['image_count']} images"
+    for dep in deployments
+}
+
 with st.expander("Select Deployments", expanded=True):
 
-    selected_deployments = []
+    deployment = st.radio(
+        "Select Deployment",
+        options=list(deployment_options.keys()),
+        format_func=lambda dep: deployment_options[dep],
+        label_visibility="collapsed"
+    )
 
-    for dep in deployments:
-        summary = summarize_deployment(dep)
-
-        checked = st.checkbox(
-            f"{dep} — {summary['image_count']} images",
-            key=f"dep_{dep}"
-        )
-
-        if checked:
-            selected_deployments.append(dep)
-
-if not selected_deployments:
+if not deployment:
     st.info("Select a deployment above to continue.")
     st.stop()
 
-deployment = selected_deployments[0]  
+# Current workflow processes one deployment at a time.
+# Multi-deployment processing will be added later.
+# if no radio add this at below:
+# deployment = selected_deployments[0]  
+
+# ==================================================
+# Selection Summary
+# ==================================================
+# calculate summary of selected deployment from the pipeline status file
+
+from utils.pipeline_status import estimate_pipeline_time
+
+summary = summarize_deployment(deployment)
+
+estimated_seconds = estimate_pipeline_time(
+    deployment,
+    summary["image_count"]
+)
+
+if estimated_seconds is None:
+    estimated_time = "Learning..."
+else:
+    estimated_seconds = int(estimated_seconds)
+
+    hours = estimated_seconds // 3600
+    minutes = (estimated_seconds % 3600) // 60
+    seconds = estimated_seconds % 60
+
+    if hours > 0:
+        estimated_time = f"~{hours}h {minutes}m"
+    elif minutes > 0:
+        estimated_time = f"~{minutes}m"
+    else:
+        estimated_time = f"~{seconds}s"
+
+st.subheader("Selection Summary")
+
+summary = summarize_deployment(deployment)
+
+col1, col2, col3 = st.columns(3)
+
+col1.metric(
+    "Deployment",
+    deployment
+)
+
+col2.metric(
+    "Images",
+    f"{summary['image_count']:,}"
+)
+
+col3.metric(
+    "Estimated Time",
+    estimated_time
+)
 
 # ==================================================
 # 3. Load Dataset
@@ -307,7 +364,7 @@ if DATASET_PATH.exists():
     print(f"Inside None block - DATASET_PATH: {DATASET_PATH}")
     print(f"Inside None block - exists: {DATASET_PATH.exists()}")
     dataset = pd.read_csv(DATASET_PATH)
-    print(f"Dataset loaded: {len(dataset)} rows")
+    
 else:
     dataset = None
     print(f"No dataset found at {DATASET_PATH}")
@@ -320,16 +377,15 @@ species_dict = pd.read_csv(DICTIONARY_PATH)
 # ==================================================
 # Backup Once Per Session
 # ==================================================
+if "backup_done" not in st.session_state:
+    st.session_state["backup_done"] = False
 
-if (
-    st.session_state.get("backup_deployment")
-    != deployment
-):
+if not st.session_state.get("backup_done"):
 
     backup_folder = create_backup(deployment)
 
     st.session_state["backup_folder"] = backup_folder
-    st.session_state["backup_deployment"] = deployment
+    st.session_state["backup_done"] = True
 
     st.toast(
         f"Backup created\n{backup_folder.name}"
@@ -351,7 +407,8 @@ with st.expander("Pipeline Options"):
 
     reset_queue = st.checkbox( # for quick test processed data only
         "Reset review queue (run from merge step)",
-        value=False
+        value=False,
+        help="Skips MegaDetector and SpeciesNet — reruns script 03 only."
     )
 
     rebuild_dictionary = st.checkbox(
@@ -379,17 +436,14 @@ if st.button("▶ Run Pipeline"):
             start = perf_counter()
 
             for script in [
-                "script07_build_dictionary.py",
-                "species_lookup.py"
+                "script04_build_dictionary.py"
             ]:
 
                 result = subprocess.run(
-
                     [
                         sys.executable,
                         str(PROJECT_ROOT / "scripts" / script)
                     ],
-
                     cwd=PROJECT_ROOT,
                     capture_output=True,
                     text=True
@@ -405,7 +459,7 @@ if st.button("▶ Run Pipeline"):
         elif reset_queue:
             duration = run_pipeline_from(
                 deployment=deployment,
-                start_from=5,
+                start_from=3,
                 progress_callback=update_progress
             )
 
@@ -425,18 +479,18 @@ if st.button("▶ Run Pipeline"):
             f"{seconds} sec"
         )
 
-        # save pipeline status
-        save_pipeline_status(
-            deployment=deployment,
-            duration_seconds=duration,
-            images_processed=len(dataset) if dataset is not None else 0
-        )
-
         # Reload dataset after pipeline
         if DATASET_PATH.exists():
             dataset = pd.read_csv(DATASET_PATH)
             st.session_state["dataset"] = dataset
-            
+
+        # save pipeline status
+        save_pipeline_status(
+            deployment=deployment,
+            duration_seconds=duration,
+            images_processed=len(dataset)
+        )
+    
         time.sleep(2)
 
         st.rerun()
@@ -449,39 +503,11 @@ if st.button("▶ Run Pipeline"):
         st.exception(error)
 
 # ==================================================
-# Build Master Dataset
-# ==================================================
-if st.button("Build Master Dataset"):
-
-    script = (
-        PROJECT_ROOT /
-        "scripts" /
-        "script09_build_master_dataset.py"
-    )
-
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(script)
-        ],
-        cwd=PROJECT_ROOT,
-        capture_output=True,
-        text=True
-    )
-
-    if result.returncode == 0:
-        st.success(result.stdout)
-    else:
-        st.error(result.stderr)
-
-
-print(f"Right before summary - dataset is None: {dataset is None}")
-print(f"Right before summary - DATASET_PATH: {DATASET_PATH}")
-print(f"Right before summary - DATASET_PATH exists: {DATASET_PATH.exists()}")
-# ==================================================
 # 6. Dataset Summary
 # ==================================================
 st.divider()
+
+st.write("Deployment :", deployment)
 
 col1, col2, col3 = st.columns(3)
 
@@ -521,9 +547,178 @@ else:
     col2.metric("Review Required", review_required)
     col3.metric("Reviewed", reviewed)
 
-# Divider
-st.divider()
+# ==================================================
+# BLOCK 5 — Species Overview
+# ==================================================
 
+st.divider()
+st.subheader("Species Overview")
+
+if dataset is not None and not dataset.empty:
+
+    display_species = (
+        dataset["verified_common_name"]
+        .replace("", pd.NA)
+        .fillna(dataset["prediction_common_name"])
+    )
+
+    # Build species counts
+    species_counts = display_species.value_counts()
+
+    st.bar_chart(species_counts)
+
+    # find which species are auto-verified
+    auto_verified_species = set(
+        dataset[dataset["review_status"] == "Auto Verified"]
+        ["verified_common_name"]
+        .dropna()
+        .unique()
+    )
+
+    # Species selector drives both gallery and flag button
+    selected_species = st.selectbox(
+        "Select Species",
+        options=species_counts.index.tolist(),
+        format_func=lambda s: f"⚡ {s}" if s in auto_verified_species else s,
+        key="gallery_species_select"
+    )
+
+    species_data = dataset[
+        display_species == selected_species
+    ]
+
+    # debugging info
+
+    print(f"Dataset rows: {len(dataset)}")
+    print(f"Species counts empty: {species_counts.empty}")
+    print(f"Selected species: {selected_species}")
+    print(f"Species data rows: {len(species_data)}")
+
+    print("Selected species:", selected_species)
+
+    best = (
+        dataset["verified_common_name"]
+        .replace("", pd.NA)
+        .fillna(dataset["prediction_common_name"])
+    )
+
+    print(best.value_counts())
+
+    print(
+        dataset[
+            [
+                "prediction_common_name",
+                "verified_common_name",
+                "review_required",
+                "review_status"
+            ]
+        ].head(20)
+    )
+    # end debugging info
+
+    st.write(f"**{selected_species}** — {len(species_data)} images")
+
+    # Flag all button — only show if species has any auto-verified images
+    auto_verified_count = (
+        (species_data["review_status"] == "Auto Verified")
+    ).sum()
+
+    if auto_verified_count > 0:
+
+        col_info, col_flag_all = st.columns([4, 1])
+
+        with col_info:
+            st.caption(
+                f"{auto_verified_count} auto-verified images. "
+                "Flag all if this species is not found in this area."
+            )
+
+        with col_flag_all:
+            if st.button(
+                "🚩 Flag All",
+                key="flag_all_species"
+            ):
+                mask = (
+                    (dataset["verified_common_name"] == selected_species)
+                    &
+                    (dataset["review_status"] == "Auto Verified")
+                )
+
+                dataset.loc[mask, "review_required"]      = True
+                dataset.loc[mask, "review_status"]        = ""
+                dataset.loc[mask, "verified_common_name"] = ""
+                dataset.loc[mask, "reviewer"]             = ""
+                dataset.loc[mask, "review_notes"]         = ""
+                dataset.loc[mask, "review_timestamp"]     = ""
+
+                dataset.to_csv(DATASET_PATH, index=False)
+                st.success(
+                    f"🚩 All {auto_verified_count} auto-verified "
+                    f"{selected_species} events flagged for re-review."
+                )
+                st.rerun()
+
+    # Pagination
+    total_images   = len(species_data)
+    images_per_page = 9
+    total_pages    = max(1, (total_images + images_per_page - 1) // images_per_page)
+
+    if f"gallery_page_{selected_species}" not in st.session_state:
+        st.session_state[f"gallery_page_{selected_species}"] = 0
+
+    current_page = st.session_state[f"gallery_page_{selected_species}"]
+
+    col_prev, col_page, col_next = st.columns([1, 3, 1])
+
+    with col_prev:
+        if st.button("← Prev", key="gallery_prev") and current_page > 0:
+            st.session_state[f"gallery_page_{selected_species}"] -= 1
+            st.rerun()
+
+    with col_page:
+        st.caption(
+            f"Page {current_page + 1} of {total_pages} "
+            f"({total_images} images)"
+        )
+
+    with col_next:
+        if st.button("Next →", key="gallery_next") and current_page < total_pages - 1:
+            st.session_state[f"gallery_page_{selected_species}"] += 1
+            st.rerun()
+
+    # Slice for current page
+    start = current_page * images_per_page
+    end   = start + images_per_page
+    gallery = species_data.iloc[start:end]
+
+    print(f"Gallery rows: {len(gallery)}")
+
+    cols = st.columns(3)
+
+    for i, (_, row) in enumerate(gallery.iterrows()):
+        with cols[i % 3]:
+            st.image(row["image_path"], use_container_width=True)
+            st.caption(f"{row['event_id']} | {row['review_status']}")
+
+            if row["review_status"] == "Auto Verified":
+                if st.button(
+                    "🚩",
+                    key=f"flag_img_{row['event_id']}_{i}"
+                ):
+                    event_mask = dataset["event_id"] == row["event_id"]
+
+                    dataset.loc[event_mask, "review_required"]      = True
+                    dataset.loc[event_mask, "review_status"]        = "Pending"
+                    dataset.loc[event_mask, "verified_common_name"] = ""
+                    dataset.loc[event_mask, "reviewer"]             = ""
+                    dataset.loc[event_mask, "review_notes"]         = ""
+                    dataset.loc[event_mask, "review_timestamp"]     = ""
+
+                    dataset.to_csv(DATASET_PATH, index=False)
+                    st.success(f"🚩 Event {row['event_id']} flagged.")
+                    st.rerun()
+# Divider
+st.divider()    
 # ==================================================
 # 9. Review Queue
 # ==================================================
@@ -757,16 +952,7 @@ if review_queue:
 
             review_log.to_csv(REVIEW_LOG_PATH, index=False)
 
-        # ==================================================
-        # Save Verification
-        # ==================================================
-
-        st.divider()
-
-        if st.session_state.get("review_saved", False):
-            st.success("Review saved successfully!")
-            st.session_state["review_saved"] = False
-
+        
         # ==================================================
         # Save Button
         # ==================================================
@@ -970,9 +1156,17 @@ if review_queue:
                     st.rerun()
 
         # ==================================================
+        # Save Verification
+        # ==================================================
+
+        if st.session_state.get("review_saved", False):
+            st.success("Review saved successfully!")
+            st.session_state["review_saved"] = False
+
+        # ==================================================
         # review saved data
         # ==================================================
-        
+        st.divider()
         st.subheader("Saved Preview")
 
         if st.session_state["undo_stack"]:
@@ -1012,7 +1206,9 @@ if review_queue:
 
         #st.divider()
 
+    # ==================================================
     # BLOCK 3 AI Prediction Summary
+    # ==================================================
     st.divider()
     # display
     st.subheader("AI Predictions Summary")
@@ -1039,7 +1235,9 @@ if review_queue:
 
     st.divider()
 
+    # ==================================================
     # BLOCK 4 — display Review Reasons + Confidence
+    # ==================================================
 
     # Review Reasons
     def get_review_reasons(event_data):
@@ -1082,46 +1280,98 @@ if review_queue:
         st.metric("Average Prediction Confidence", f"{average_score:.2%}")
 
 
-# BLOCK 5 — Species Overview
+
+# ==================================================
+# BLOCK 6 — master dataset 
+# ==================================================
+
 st.divider()
+st.subheader("Master Dataset")
 
-st.subheader("Species Overview")
+# Show all deployments with review status
+from config.paths import DEPLOYMENTS_OUTPUT
 
-# Species Bar Chart
-species_counts = (
-    dataset["verified_common_name"]
-    .fillna(dataset["prediction_common_name"])
-    .value_counts()
-)
+master_rows = []
 
-st.bar_chart(species_counts)
+for deployment_folder in sorted(DEPLOYMENTS_OUTPUT.iterdir()):
 
-# Expandable Species Gallery
-st.subheader("Species Gallery")
+    if not deployment_folder.is_dir():
+        continue
 
-species_list = species_counts.index.tolist()
+    dep_paths    = get_deployment_paths(deployment_folder.name)
+    dataset_file = dep_paths["dataset"]
 
-selected_species = st.selectbox(
-    "Select Species",
-    species_list
-)
+    if not dataset_file.exists():
+        master_rows.append({
+            "Deployment": deployment_folder.name,
+            "Images":     0,
+            "Reviewed":   0,
+            "Pending":    0,
+            "Status":     "Not processed"
+        })
+        continue
 
-species_data = dataset[
-    dataset["verified_common_name"].fillna(
-        dataset["prediction_common_name"]
-    ) == selected_species
-]
+    df       = pd.read_csv(dataset_file)
+    images   = len(df)
+    reviewed = (df["review_status"] == "Reviewed").sum() if "review_status" in df.columns else 0
+    pending  = (df["review_required"] == True).sum() if "review_required" in df.columns else 0
 
-# display images for selected species
-st.write(f"Total Images: {len(species_data)}")
+    master_rows.append({
+        "Deployment": deployment_folder.name,
+        "Images":     images,
+        "Reviewed":   reviewed,
+        "Pending":    pending,
+        "Status":     "✅ Complete" if pending == 0 else f"⏳ {pending} pending"
+    })
 
-gallery = species_data.sample(
-    min(12, len(species_data)),
-    random_state=42
-)
+# this the table of all deployments with review status, and the user can select which deployments to include in the master dataset build
+#master_summary_df = pd.DataFrame(master_rows)
 
-cols = st.columns(4)
+#st.dataframe(
+    #master_summary_df,
+    #use_container_width=True,
+    #hide_index=True
+#)
 
-for i, (_, row) in enumerate(gallery.iterrows()):
-    with cols[i % 4]:
-        st.image(row["image_path"], use_container_width=True)
+# Deployment selection for master build
+with st.expander("Select Deployments for Master Dataset", expanded=False):
+
+    selected_for_master = []
+
+    for row in master_rows:
+
+        checked = st.checkbox(
+            f"{row['Deployment']} — {row['Images']} images — {row['Status']}",
+            value=row["Status"] == "✅ Complete",
+            key=f"master_{row['Deployment']}"
+        )
+
+        if checked:
+            selected_for_master.append(row["Deployment"])
+
+if not selected_for_master:
+    st.info("Select at least one deployment to build master dataset.")
+
+else:
+
+    st.write(
+        f"Selected: {len(selected_for_master)} deployments"
+    )
+
+    if st.button("🗂 Build Master Dataset"):
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "scripts" / "script06_build_master_dataset.py"),
+                *selected_for_master
+            ],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0:
+            st.success(result.stdout)
+        else:
+            st.error(result.stderr)

@@ -44,20 +44,14 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from config.paths import (
     SAMPLE_PATH,
-    AUDIT_OUTPUT,
-    AUDIT_REPORT
+    DEPLOYMENTS_OUTPUT,
+    LOGS_OUTPUT
 )
 
 sample_folder = SAMPLE_PATH / "REC055_199A"
 
-AUDIT_OUTPUT.mkdir(
-    parents=True,
-    exist_ok=True
-)
-
-output_folder = AUDIT_OUTPUT
-
-report_file = AUDIT_REPORT
+output_folder = DEPLOYMENTS_OUTPUT
+report_file   = LOGS_OUTPUT / "audit_report.txt"
 
 
 # mkdir() creates the folder if it doesn't exist.

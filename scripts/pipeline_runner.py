@@ -21,37 +21,21 @@ def get_pipeline(deployment):
     paths = get_deployment_paths(deployment)
 
     return [
-
         {
             "script": "script01_run_megadetector.py",
-            "name": "Running MegaDetector",
+            "name":   "Running MegaDetector",
             "output": paths["megadetector_json"]
         },
-
         {
-            "script": "script02_build_detection.py",
-            "name": "Building Detection Dataset",
-            "output": paths["detection_csv"]
-        },
-
-        {
-            "script": "script03_run_speciesnet.py",
-            "name": "Running SpeciesNet",
+            "script": "script02_run_speciesnet.py",
+            "name":   "Running SpeciesNet",
             "output": paths["speciesnet_json"]
         },
-
         {
-            "script": "script04_merge_species_results.py",
-            "name": "Merging Species Results",
-            "output": paths["dataset"]
-        },
-
-        {
-            "script": "script05_build_review_queue.py",
-            "name": "Building Review Queue",
+            "script": "script03_build_wildlife_dataset.py",
+            "name":   "Merging & Building Review Queue",
             "output": paths["dataset"]
         }
-
     ]
 # ==================================================
 # Run Pipeline

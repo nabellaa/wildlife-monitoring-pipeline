@@ -13,32 +13,56 @@ Built on real fieldwork data of **~86,000 camera trap images** collected over **
 
 ## Project Overview
 
-This system processes wildlife camera trap images through:
+This project combines **computer vision**, **data engineering**, and **human-in-the-loop verification** into a single workflow for wildlife monitoring.
 
-- AI detection (MegaDetector) + species classification (SpeciesNet)
-- Human-in-the-loop verification via Streamlit review interface
-- Full audit trail (review logs, undo system, session backup)
-- Multi-deployment dataset management
-- Master dataset + clean dataset generation
-- Analytics-ready ecological data pipeline
+The system automatically:
 
-Designed for **scalable biodiversity monitoring across multiple locations and deployments**.
+- Detects wildlife using **MegaDetector**
+- Identifies species using **SpeciesNet**
+- Builds a structured wildlife dataset
+- Automatically enriches taxonomy information
+- Flags uncertain predictions for manual verification
+- Provides an interactive Streamlit review interface
+- Generates deployment-level and master datasets ready for ecological analysis
+
+Designed for scalable biodiversity monitoring across multiple camera trap deployments.
 
 ---
 
 ## App Preview
 
-### Deployment and Pipeline Runner
-![Deployment and Pipeline Runner](docs/images/deployment_pipeline.png)
+### Deployment Manager
+_Select deployment and run the AI pipeline._
 
-### Folder Information and Event Queue
-![Folder Information and Event Queue](docs/images/info_review_queue.png)
+![Deployment Manager](docs/images/deployment_pipeline.png)
+
+---
+
+### Pipeline & Event Queue
+_View processing status, event queue, and deployment summary._
+
+![Pipeline](docs/images/info_review_queue.png)
+
+---
 
 ### Review Interface
+_Event-based review with AI predictions, taxonomy information, and manual verification._
+
 ![Review Interface](docs/images/review_interface.png)
 
+---
+
 ### AI Prediction Information
-![AI Prediction Information](docs/images/ai_prediction_info.png)
+_Bounding boxes, prediction confidence, taxonomy, and metadata._
+
+![Prediction](docs/images/ai_prediction_info.png)
+
+---
+
+### Species Overview
+_Per-deployment species distribution with image gallery and bulk re-review tools._
+
+*(Add screenshot when available.)*
 
 ---
 
@@ -52,78 +76,188 @@ The system is built in **three main layers**:
 
 Each deployment is an independent, reproducible processing unit.
 
-### Features:
-- Raw image processing
-- Detection + classification pipeline
-- Human-in-the-loop review system
-- Independent logs, backups, and session state per deployment
+### Features
 
-### Structure:
+- Camera trap image management
+- AI processing pipeline
+- Human review interface
+- Independent outputs
+- Independent review logs
+- Independent backups
+
+Example:
+
 ```text
 deployments/
-├── deployment_01/
-├── deployment_02/
-├── deployment_03/
+├── apr-2019/
+├── mei-2019/
+├── jun-2019/
+├── jul-2019/
 ```
 
 ---
 
-## 2. Master Dataset Layer (Aggregation Layer)
+## 2. Master Dataset Layer
 
-All deployments are merged into a single unified dataset.
+Reviewed deployments are combined into one standardized dataset.
 
-### Responsibilities:
-- Combine all deployment outputs
-- Standardize schema across runs
-- Add deployment metadata
-- Ensure cross-experiment consistency
+Responsibilities:
 
-### Output:
-- `master_dataset_raw.csv`
+- Merge deployments
+- Preserve deployment metadata
+- Standardize schema
+- Prepare for dashboarding
 
----
+Output:
 
-## 3. Clean Dataset Layer (Intelligence Layer)
-
-Final curated dataset for analytics and dashboards.
-
-### Responsibilities:
-- Taxonomy normalization and species name standardization
-- Review reconciliation and duplicate handling
-- Final ground-truth dataset generation
-
-### Output:
-- `clean_dataset.csv`
+```
+master_dataset.csv
+```
 
 ---
 
-# System Pipeline Flow
+## 3. Analytics Layer
+
+The cleaned dataset is designed for downstream analysis.
+
+Future dashboards include:
+
+- Species distribution
+- Camera performance
+- Deployment comparison
+- Review statistics
+- Ecological summaries
+
+---
+
+# AI Pipeline
+
+The current automated pipeline consists of **three processing stages**.
 
 ```text
 Camera Trap Images
-        ↓
-script01_audit.py              — Validate images and metadata
-        ↓
-script02_run_megadetector.py   — Object detection (animal/human/vehicle/empty)
-        ↓
-script03_build_detection.py    — Build structured detection dataset
-        ↓
-script04_run_speciesnet.py     — Species classification + confidence scoring
-        ↓
-script05_merge_species_results.py  — Merge detection + classification outputs
-        ↓
-script06_build_review_queue.py — Flag low-confidence and unknown predictions
-        ↓
-species_lookup.py                  — Auto-enrich species with taxonomy data
-        ↓
-wildlife_monitor.py            — Streamlit human-in-the-loop review UI
-        ↓
-script08_backup_manager.py     — Session backup and state management
-        ↓
-script09_build_master_dataset.py   — Aggregate all deployments into master dataset
-        ↓
-Clean Dataset Generation       — Final analytics-ready output
+        │
+        ▼
+script02_run_megadetector.py
+(Object Detection)
+        │
+        ▼
+script03_build_wildlife_dataset.py
+(Build Detection Dataset
++ SpeciesNet Merge
++ Taxonomy Enrichment
++ Review Queue)
+        │
+        ▼
+species_lookup.py
+(Auto Taxonomy Lookup)
+        │
+        ▼
+Wildlife Review App
+(Streamlit)
+        │
+        ▼
+Master Dataset Builder
+        │
+        ▼
+Clean Dataset
 ```
+
+---
+
+# Streamlit Review Application
+
+The review interface is the central component of the project.
+
+## Deployment Manager
+
+- Select deployment
+- View image count
+- Estimated processing time based on previous runs
+- Run pipeline
+- Reset review queue
+- Skip completed processing
+
+---
+
+## Review Queue
+
+Displays only events requiring verification.
+
+Features include:
+
+- Event-based navigation
+- Bounding box overlay
+- AI prediction
+- Classifier prediction
+- Taxonomy information
+- Camera metadata
+- Review history
+
+---
+
+## Human Review
+
+Users can:
+
+- Verify AI prediction
+- Correct species
+- Add custom species
+- Add review notes
+- Undo previous actions
+
+Every review updates:
+
+- Review status
+- Reviewer
+- Timestamp
+- Species taxonomy
+
+---
+
+## Species Overview
+
+Each deployment includes a live species summary.
+
+Features:
+
+- Species frequency bar chart
+- Image gallery by species
+- Auto-verified species indicator
+- Bulk "Flag All" for re-review
+- Individual image flagging
+- Pagination for large datasets
+
+This provides a quick overview of wildlife detected within a deployment before detailed review.
+
+---
+
+# Review Workflow
+
+```text
+MegaDetector
+        │
+SpeciesNet
+        │
+        ▼
+Prediction Accepted?
+        │
+ ┌──────┴──────┐
+ │             │
+Auto Verified  Needs Review
+ │             │
+ │      Human Verification
+ │             │
+ └──────┬──────┘
+        │
+Verified Dataset
+```
+
+Review statuses:
+
+- Auto Verified
+- Pending
+- Verified
 
 ---
 
@@ -132,81 +266,31 @@ Clean Dataset Generation       — Final analytics-ready output
 ```text
 config/
 ├── deployment.py              — Deployment configuration
-├── paths.py                   — Path management
+└── paths.py                   — Path management
 
 app/
-├── wildlife_monitor.py        — Streamlit review interface (main UI)
+└── wildlife_monitor.py        — Streamlit review interface (main UI)
 
 scripts/
-├── script01_audit.py
-├── script02_run_megadetector.py
-├── script03_build_detection.py
-├── script04_run_speciesnet.py
-├── script05_merge_species_results.py
-├── script06_build_review_queue.py
-├── script08_backup_manager.py
-├── script09_build_master_dataset.py
-├── species_lookup.py          — Taxonomy enrichment
 ├── pipeline_runner.py         — Central pipeline execution controller
+├── script01_run_megadetector.py
+├── script02_run_speciesnet.py
+├── script03_build_wildlife_dataset.py
+├── script04_build_dictionary.py
+├── script05_backup_manager.py
+└── script06_build_master_dataset.py
+
+utils/
+├── audit.py
+├── pipeline_status.py
+└── species_lookup.py          — Taxonomy enrichment
+
+outputs/
+├── deployments/
+├── master/
+└── logs/
+
 ```
-
----
-
-# AI Pipeline Workflow
-
-### 1. Data Audit
-- Validate raw camera trap images, folder structure, and metadata consistency
-
-### 2. Object Detection (MegaDetector)
-- Detect animals, humans, vehicles, and empty frames
-- Produce bounding boxes and confidence scores per image
-
-### 3. Detection Dataset Building
-- Convert MegaDetector JSON outputs into structured tabular dataset
-- Standardize event-based format (event_id, image mapping)
-
-### 4. Species Classification (SpeciesNet)
-- Predict species from detected wildlife images
-- Generate predicted species (common name), confidence score, and full taxonomy (class → order → family → genus → species)
-- Flag low-confidence and unknown predictions for human review
-
-### 5. Data Integration
-- Merge MegaDetector detection output with SpeciesNet classification results
-- Build unified single-source-of-truth dataset per deployment
-
-### 6. Review Queue Generation
-- Filter cases requiring human attention:
-  - Unknown species
-  - Low-confidence predictions
-  - Conflicting AI outputs
-- Prioritize images for manual verification
-
-### 7. Species Enrichment (species_lookup.py)
-- Automatically look up blank or new species entries
-- Enriches dataset with:
-  - Full taxonomy (class → order → family → genus → species)
-- Ensures no species record is left with incomplete ecological metadata
-
-### 8. Human-in-the-Loop Review System (Streamlit)
-- Species verification dropdown with dynamic "Other…" custom input
-- Event-based image navigation with bounding box overlay
-- Session-based undo stack — snapshot before every change, safe rollback
-- Full dataset backup per session
-- Dynamic species dictionary — auto-updates as new species are added during review
-
-### 9. Review Logging
-- Tracks every review action:
-  - Original AI prediction
-  - Human correction
-  - Timestamp and event_id
-- Enables complete audit trail of all verification decisions
-
-### 10. Master Dataset Builder
-- Aggregates all reviewed deployment outputs into a unified master dataset
-- Standardizes schema and adds deployment metadata across runs
-
-### 11. Clean Dataset Output
-- Final analysis-ready dataset after taxonomy normalization, deduplication, and review reconciliation
 
 ---
 
@@ -224,7 +308,7 @@ scripts/
 - `classifier_species`, `classifier_common_name`, `classifier_score`
 
 ### Taxonomy
-- `class`, `order`, `family`, `genus`, `species`, `common_name`
+- `class`, `order`, `family`, `genus`, `species`, `scientific_name`,`common_name`
 
 ### Human Review Layer
 - `review_status` (Pending / Verified / Corrected / Skipped)
@@ -279,15 +363,12 @@ scripts/
 - Confidence scoring trends
 - Review performance metrics
 
-**Admin Panel** (Streamlit):
-- Species dictionary management
-- Backup management system
-- Review logs explorer
-- System monitoring
+### GIS Integration
 
-**Data Enrichment**:
-- Integration of camera site data (coordinates, habitat type, environment)
-- GIS spatial analysis layer
+- Camera locations
+- Habitat visualization
+- Spatial analysis
+- Species distribution mapping
 
 ---
 

@@ -28,18 +28,18 @@ if str(PROJECT_ROOT) not in sys.path:
 from utils.species_lookup import get_species_information
 
 from config.paths import (
-    DICTIONARY_PATH
+    DICTIONARY_PATH,
+    DEPLOYMENTS_OUTPUT,
+    get_deployment_paths
 )
 
 # ==================================================
 # 3. Load Data
 # ==================================================
-from config.deployments import summarize_deployment
-from config.paths import get_deployment_paths, OUTPUT_PATH
 
 all_data = []
 
-for deployment_folder in sorted(OUTPUT_PATH.iterdir()):
+for deployment_folder in sorted(DEPLOYMENTS_OUTPUT.iterdir()):
 
     if not deployment_folder.is_dir():
         continue
