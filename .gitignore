@@ -50,4 +50,4 @@ backup/
 # Docs notes (your request)
 # =========================
 docs/**/*.txt
-docs/from-fyp/**/*
+docs/from-fyp/
