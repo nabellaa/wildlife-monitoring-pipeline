@@ -242,11 +242,25 @@ for image in megadetector_results:
         key=lambda d: d["conf"]
     )
 
+    # Extract Camera Name
+    camera_name = ""
+
+    for parent in image_path.parents:
+        folder = parent.name.replace(" ", "")
+
+        if (
+            folder.startswith("REC")
+            or folder.startswith("XR")
+            or folder.startswith("HC")
+        ):
+            camera_name = folder.split("_")[0]
+            break
+
     row = {
         "image_path":           image["file"],
         "file_name":            image_path.name,
-        "folder_name":          image_path.parent.name,
-        "camera_name":          image_path.parent.parent.name,
+        "folder_name":          image_path.parent.parent.name,
+        "camera_name":          camera_name,
         "capture_datetime":     capture_datetime,
         "temperature_c":        temperature,
         "moon_phase":           metadata.get("MoonPhase"),
@@ -291,9 +305,9 @@ df = pd.DataFrame(dataset)
 df["event_id"] = (
     deployment
     + "_"
-    + df["camera_name"]
-    + "_"
     + df["folder_name"]
+    + "_"
+    + df["camera_name"]
     + "_"
     + df["event_number"].astype(str)
 )

@@ -4,7 +4,7 @@
 # Get Deployments
 # ==================================================
 
-from config.paths import SAMPLE_PATH, BATCH_SAMPLE_PATH
+from config.paths import SAMPLE_PATH, BATCH_SAMPLE_PATH, RAW_DATA_PATH
 
 def get_deployments():
     """
@@ -15,7 +15,7 @@ def get_deployments():
 
     return sorted(
         folder.name
-        for folder in BATCH_SAMPLE_PATH.iterdir()
+        for folder in RAW_DATA_PATH.iterdir()
         if folder.is_dir()
     )
 
@@ -28,7 +28,7 @@ def get_deployment_path(deployment):
     Return the full path to a deployment folder.
     """
 
-    return BATCH_SAMPLE_PATH / deployment
+    return RAW_DATA_PATH / deployment
 
 # ==================================================
 # Discover Deployments

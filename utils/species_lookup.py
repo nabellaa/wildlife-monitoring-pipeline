@@ -55,11 +55,8 @@ def empty_species_record(common_name):
         "taxonomy_genus": "",
         "taxonomy_species": "",
 
-        "iucn_status": "",
-        "population_trend": "",
-
-        "taxonomy_source": "",
-        "iucn_source": ""
+        "taxonomy_source": ""
+   
 
     }
 

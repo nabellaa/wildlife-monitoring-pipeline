@@ -16,40 +16,20 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
-from utils.species_lookup import get_species_information
+from config.deployments import (
+    get_deployments)
 
 from config.paths import (
     DEPLOYMENTS_OUTPUT,
-    get_deployments,
     get_deployment_paths,
     MASTER_DATASET,
     DEPLOYMENT_SUMMARY
 )
-
-# ==================================================
-# Build Master Dataset
-# ==================================================
-
-# AUTO-FILL TAXONOMY HERE
-taxonomy_columns = [
-
-        "scientific_name",
-
-        "taxonomy_class",
-        "taxonomy_order",
-        "taxonomy_family",
-        "taxonomy_genus",
-        "taxonomy_species",
-
-        "taxonomy_source"
-
-    ]
     
-all_data = []
-
 # ==================================================
 # Selected Deployments
 # ==================================================
+all_data = []
 
 # if deployments passed as args use them
 # otherwise process all
@@ -75,94 +55,6 @@ for deployment in selected:
 
     # Keep deployment information
     df.insert(0, "deployment", deployment)
-
-    # ==================================================
-    # Auto-fill Verified Species
-    # ==================================================
-
-    mask = (
-
-        (df["review_required"] == False)
-
-        &
-
-        (
-            df["verified_common_name"]
-            .fillna("")
-            .str.strip()
-            == ""
-        )
-
-        &
-
-        (df["prediction_rank"] == "Species")
-
-        &
-
-        (
-            df["prediction_common_name"]
-            .fillna("")
-            .str.strip()
-            != ""
-        )
-
-    )
-
-    df.loc[
-        mask,
-        "verified_common_name"
-    ] = df.loc[
-        mask,
-        "prediction_common_name"
-    ]
-
-    for i, row in df.iterrows():
-
-        # Skip if taxonomy already exists
-        if (
-            pd.notna(row["scientific_name"])
-            and str(row["scientific_name"]).strip() != ""
-        ):
-            continue
-
-        # Determine which species name to lookup
-        if (
-            pd.notna(row["verified_common_name"])
-            and str(row["verified_common_name"]).strip() != ""
-        ):
-            species_name = row["verified_common_name"]
-
-        elif (
-            row["prediction_rank"] == "Species"
-            and pd.notna(row["prediction_common_name"])
-            and str(row["prediction_common_name"]).strip() != ""
-        ):
-            species_name = row["prediction_common_name"]
-
-        else:
-            continue
-
-        # Build SpeciesNet prediction dictionary
-        prediction = row.to_dict()
-        
-        # Lookup taxonomy
-        species = get_species_information(
-            species_name, 
-            prediction=prediction
-        )
-
-        # Fill taxonomy fields
-        for column in taxonomy_columns:
-            df.loc[i, column] = species[column]
-
-        
-    # Master Timestamp
-    df.insert(
-        1,
-        "master_updated",
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    )
-
     all_data.append(df)
 
 # ==================================================
@@ -191,14 +83,13 @@ if all_data:
 else:
     print("No deployment datasets found.")
 
-
 # ==================================================
 # Deployment Summary
 # ==================================================
 
 summary_rows = []
 
-for deployment in get_deployments():
+for deployment in selected:
     paths = get_deployment_paths(deployment)
     dataset_file = paths["dataset"]
 
@@ -210,24 +101,26 @@ for deployment in get_deployments():
     events = df["event_id"].nunique()
 
     reviewed = (
-        df["review_status"] == "Reviewed"
-    ).sum()
-
-    species = (
-        df["verified_common_name"]
-        .dropna()
-        .nunique()
+        df["review_status"]
+        .isin([
+            "Auto Verified",
+            "Verified",
+            "Corrected"
+        ])
+        .sum()
     )
 
-    unknown = (
+    display_species = (
         df["verified_common_name"]
-        == "Unknown"
-    ).sum()
+        .replace("", pd.NA)
+        .fillna(df["prediction_common_name"])
+    )
 
-    human = (
-        df["verified_common_name"]
-        == "Human"
-    ).sum()
+    species = display_species.nunique()
+
+    unknown = (display_species == "Unknown").sum()
+
+    human = (display_species == "Human").sum()
 
     summary_rows.append({
         "deployment": deployment,

@@ -406,7 +406,7 @@ with st.expander("Pipeline Options"):
     )
 
     reset_queue = st.checkbox( # for quick test processed data only
-        "Reset review queue (run from merge step)",
+        "Reset wildlife dataset (skip megadetector and speciesnet)",
         value=False,
         help="Skips MegaDetector and SpeciesNet — reruns script 03 only."
     )
@@ -619,33 +619,38 @@ if dataset is not None and not dataset.empty:
     st.write(f"**{selected_species}** — {len(species_data)} images")
 
     # Flag all button — only show if species has any auto-verified images
-    auto_verified_count = (
-        (species_data["review_status"] == "Auto Verified")
-    ).sum()
+    re_review_count = (
+        species_data["review_status"]
+        .isin(["Auto Verified", "Reviewed"])
+        .sum()
+    )
 
-    if auto_verified_count > 0:
+    if re_review_count > 0:
 
         col_info, col_flag_all = st.columns([4, 1])
 
         with col_info:
             st.caption(
-                f"{auto_verified_count} auto-verified images. "
+                f"{re_review_count} reviewed images. "
                 "Flag all if this species is not found in this area."
             )
 
         with col_flag_all:
             if st.button(
-                "🚩 Flag All",
+                "↩ Send All to Review",
                 key="flag_all_species"
             ):
                 mask = (
-                    (dataset["verified_common_name"] == selected_species)
+                    (display_species == selected_species)
                     &
-                    (dataset["review_status"] == "Auto Verified")
+                    (
+                        dataset["review_status"]
+                        .isin(["Auto Verified", "Reviewed"])
+                    )
                 )
 
                 dataset.loc[mask, "review_required"]      = True
-                dataset.loc[mask, "review_status"]        = ""
+                dataset.loc[mask, "review_status"]        = "Pending"
                 dataset.loc[mask, "verified_common_name"] = ""
                 dataset.loc[mask, "reviewer"]             = ""
                 dataset.loc[mask, "review_notes"]         = ""
@@ -653,7 +658,7 @@ if dataset is not None and not dataset.empty:
 
                 dataset.to_csv(DATASET_PATH, index=False)
                 st.success(
-                    f"🚩 All {auto_verified_count} auto-verified "
+                    f"All {re_review_count} reviewed "
                     f"{selected_species} events flagged for re-review."
                 )
                 st.rerun()
@@ -700,9 +705,12 @@ if dataset is not None and not dataset.empty:
             st.image(row["image_path"], use_container_width=True)
             st.caption(f"{row['event_id']} | {row['review_status']}")
 
-            if row["review_status"] == "Auto Verified":
+            if row["review_status"] in [
+                "Auto Verified",
+                "Reviewed"
+            ]:
                 if st.button(
-                    "🚩",
+                    "Re-review",
                     key=f"flag_img_{row['event_id']}_{i}"
                 ):
                     event_mask = dataset["event_id"] == row["event_id"]
@@ -715,7 +723,7 @@ if dataset is not None and not dataset.empty:
                     dataset.loc[event_mask, "review_timestamp"]     = ""
 
                     dataset.to_csv(DATASET_PATH, index=False)
-                    st.success(f"🚩 Event {row['event_id']} flagged.")
+                    st.success(f"Event {row['event_id']} flagged.")
                     st.rerun()
 # Divider
 st.divider()    
@@ -1358,7 +1366,7 @@ else:
         f"Selected: {len(selected_for_master)} deployments"
     )
 
-    if st.button("🗂 Build Master Dataset"):
+    if st.button("Build Master Dataset"):
 
         result = subprocess.run(
             [

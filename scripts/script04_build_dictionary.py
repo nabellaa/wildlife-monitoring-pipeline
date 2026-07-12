@@ -192,10 +192,7 @@ species_dictionary = species_dictionary[[
     "taxonomy_family",
     "taxonomy_genus",
     "taxonomy_species",
-    "iucn_status",
-    "population_trend",
     "taxonomy_source",
-    "iucn_source",
     "status"
 ]]
 

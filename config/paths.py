@@ -24,6 +24,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_PATH         = PROJECT_ROOT / "data"
 SAMPLE_PATH       = DATA_PATH / "sample"
 BATCH_SAMPLE_PATH = DATA_PATH / "batch_sample"
+RAW_DATA_PATH      = DATA_PATH / "raw" 
 OUTPUT_PATH       = PROJECT_ROOT / "outputs"
 REFERENCE_PATH    = PROJECT_ROOT / "reference"
 BACKUP_PATH       = PROJECT_ROOT / "backup"
@@ -63,23 +64,19 @@ def get_deployment_paths(deployment,create_folders=False):
     Build every output path for one deployment.
     """
     # INPUT (sample/batch sample /RAW DATA)
-    input_root = BATCH_SAMPLE_PATH / deployment
+    input_root = RAW_DATA_PATH / deployment
 
     # OUTPUT (PROCESSED DATA)
     deployment_root = DEPLOYMENTS_OUTPUT  / deployment
 
-    audit        = deployment_root / "audit"
     megadetector = deployment_root / "megadetector"
-    detection    = deployment_root / "detection"
     speciesnet   = deployment_root / "speciesnet"
     processed    = deployment_root / "processed"
 
     # Only create folders when running pipeline
     if create_folders:
         for folder in (
-            audit,
             megadetector,
-            detection,
             speciesnet,
             processed
         ):
@@ -94,16 +91,12 @@ def get_deployment_paths(deployment,create_folders=False):
         "deployment_root": deployment_root,
 
         # OUTPUT SUBFOLDERS
-        "audit_folder":        audit,
         "megadetector_folder": megadetector,
-        "detection_folder":    detection,
         "speciesnet_folder":   speciesnet,
         "processed_folder":    processed,
 
         # OUTPUT FILES
-        "audit_report":      audit        / "audit_report.txt",
         "megadetector_json": megadetector / "megadetector_results.json",
-        "detection_csv":     detection    / "detection_dataset.csv",
         "speciesnet_json":   speciesnet   / "speciesnet_results.json",
         "dataset":           processed    / "wildlife_dataset.csv",
         "review_log":        processed    / "review_log.csv"
